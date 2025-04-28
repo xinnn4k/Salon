@@ -7,25 +7,24 @@ VS Code (optional but recommended)
 👉 Download from https://code.visualstudio.com/
 
 
-1)              Installation (for Mac)
+#Installation (for Mac)
 Clone the repository
 
 Терминал руугаа ороод доод талын 3-ыг хуулаад тавиарай.
-git clone https://github.com/xinnn4k/Salon.git
+1)git clone https://github.com/xinnn4k/Salon.git
 cd Salon
 code .
 
-2)              Install dependencies
+#Install dependencies
 Одоо хэрэгтэй сангуудыг дараах кодыг терминал дээрээ бичээд татна.
-npm install
+2)npm install
 
 
-3)              Start the development server
-
+#Start the development server
 Татаж дууссаныхаа дараа, доорх кодыг бичиж серверээ ажиллуулна.
-npm run dev
+3)npm run dev
 Асаж дууссаны дараа, браузер дээрээ доох линкээр ороорой
-http://localhost:5173
+4)http://localhost:5173
 
 Tech Stack
 React.js (TypeScript)
