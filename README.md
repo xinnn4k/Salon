@@ -1,46 +1,39 @@
-# Getting Started with Create React App
+Setup Instructions
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Node.js and npm installed
+👉 Download from https://nodejs.org/ (Recommended LTS version)
 
-## Available Scripts
+VS Code (optional but recommended)
+👉 Download from https://code.visualstudio.com/
 
-In the project directory, you can run:
 
-### `npm start`
+1)              Installation (for Mac)
+Clone the repository
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+Терминал руугаа ороод доод талын 3-ыг хуулаад тавиарай.
+git clone https://github.com/xinnn4k/Salon.git
+cd Salon
+code .
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+2)              Install dependencies
+Одоо хэрэгтэй сангуудыг дараах кодыг терминал дээрээ бичээд татна.
+npm install
 
-### `npm test`
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+3)              Start the development server
 
-### `npm run build`
+Татаж дууссаныхаа дараа, доорх кодыг бичиж серверээ ажиллуулна.
+npm run dev
+Асаж дууссаны дараа, браузер дээрээ доох линкээр ороорой
+http://localhost:5173
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Tech Stack
+React.js (TypeScript)
+Tailwind CSS
+Vite (assuming you use Vite, since it's common with React + Tailwind projects)
+Node.js (Backend, if needed later)
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+Notes for Mac Users
+If you get permission issues, use:
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
-
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
-
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
+sudo npm install
