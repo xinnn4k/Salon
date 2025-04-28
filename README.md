@@ -11,20 +11,20 @@ VS Code (optional but recommended)
 Clone the repository
 
 Терминал руугаа ороод доод талын 3-ыг хуулаад тавиарай.
-1)    git clone https://github.com/xinnn4k/Salon.git
-cd Salon
-code .
+1)      git clone https://github.com/xinnn4k/Salon.git
+        cd Salon
+        code .
 
 #Install dependencies
 Одоо хэрэгтэй сангуудыг дараах кодыг терминал дээрээ бичээд татна.
-2)    npm install
+2)       npm install
 
 
 #Start the development server
 Татаж дууссаныхаа дараа, доорх кодыг бичиж серверээ ажиллуулна.
-3)    npm run dev
+3)      npm run dev
 Асаж дууссаны дараа, браузер дээрээ доох линкээр ороорой
-4)    http://localhost:5173
+4)      http://localhost:5173
 
 Tech Stack
 React.js (TypeScript)
