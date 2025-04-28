@@ -17,14 +17,14 @@ Clone the repository
 
 #Install dependencies
 Одоо хэрэгтэй сангуудыг дараах кодыг терминал дээрээ бичээд татна.
-2)       npm install
+2)        npm install
 
 
 #Start the development server
 Татаж дууссаныхаа дараа, доорх кодыг бичиж серверээ ажиллуулна.
-3)      npm run dev
+3)        npm run dev
 Асаж дууссаны дараа, браузер дээрээ доох линкээр ороорой
-4)      http://localhost:5173
+4)        http://localhost:5173
 
 Tech Stack
 React.js (TypeScript)
