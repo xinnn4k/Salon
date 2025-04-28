@@ -1,38 +1,27 @@
-Setup Instructions
-
-Node.js and npm installed
-👉 Download from https://nodejs.org/ (Recommended LTS version)
-
-VS Code (optional but recommended)
-👉 Download from https://code.visualstudio.com/
-
-
-#Installation (for Mac)
+Installation (for Mac)
 Clone the repository
+Терминал руугаа ороод доод талын 3 командыг хуулаад тавиарай:
 
-Терминал руугаа ороод доод талын 3-ыг хуулаад тавиарай.
-1)      git clone https://github.com/xinnn4k/Salon.git
+        git clone https://github.com/xinnn4k/Salon.git
         cd Salon
         code .
+        
+Install dependencies
+Одоо хэрэгтэй сангуудыг дараах кодоор татна уу:
 
-#Install dependencies
-Одоо хэрэгтэй сангуудыг дараах кодыг терминал дээрээ бичээд татна.
-2)        npm install
+        npm install
+        
+Start the development server
+Татаж дууссаныхаа дараа серверээ асаах:
 
+        npm run dev
+        
+Browser дээр ажиллуулах
+Сервер ассаны дараа доорх линкээр орно уу:
 
-#Start the development server
-Татаж дууссаныхаа дараа, доорх кодыг бичиж серверээ ажиллуулна.
-3)        npm run dev
-Асаж дууссаны дараа, браузер дээрээ доох линкээр ороорой
-4)        http://localhost:5173
-
-Tech Stack
-React.js (TypeScript)
-Tailwind CSS
-Vite (assuming you use Vite, since it's common with React + Tailwind projects)
-Node.js (Backend, if needed later)
-
+        http://localhost:5173
+        
 Notes for Mac Users
-If you get permission issues, use:
+If you get permission issues when installing:
 
-sudo npm install
+        sudo npm install
