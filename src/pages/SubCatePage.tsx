@@ -1,24 +1,30 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { useCategories } from '../hooks/useCategories';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Layout from '../components/Layout/Layout';
 import PaginationCardList from '../components/UI/PaginationCardList';
 import { FaArrowLeft } from 'react-icons/fa';
+import { useCardData } from '../hooks/useSalonData';
 
 export default function SubcategoryDetailPage() {
   const { subcategoryId } = useParams<{ subcategoryId: string }>();
   const navigate = useNavigate();
   const categories = useCategories();
-  const [subcategory, setSubcategory] = useState<any>(null);
-
-  useEffect(() => {
-
-    const found = categories.flatMap(c => c.subcategories).find(sc => sc.id === subcategoryId);
-
-    if (found && found.id !== subcategory?.id) {
-      setSubcategory(found);
-    }
-  }, [subcategoryId, categories]); 
+  const cardData = useCardData();
+  
+  // Use useMemo to find the subcategory
+  const subcategory = useMemo(() => {
+    return categories.flatMap(c => c.subcategories).find(sc => sc.id === subcategoryId) || null;
+  }, [subcategoryId, categories]);
+  
+  // Use useMemo to filter the salons
+  const matchedSalons = useMemo(() => {
+    if (!subcategory) return [];
+    
+    return cardData.filter(salon =>
+      salon.services.some(service => service.id === subcategory.id)
+    );
+  }, [subcategory, cardData]);
 
   if (!subcategory) {
     return <div className="flex justify-center items-center h-screen">Loading...</div>;
@@ -33,7 +39,7 @@ export default function SubcategoryDetailPage() {
             className="flex items-center bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-full transition-all duration-300 transform shadow-md focus:outline-none"
           >
             {FaArrowLeft({ size: 15 })}
-            Буцах
+            <span className="ml-2">Буцах</span>
           </button>
 
           <div className="flex flex-col md:flex-row gap-8 items-center">
@@ -54,7 +60,7 @@ export default function SubcategoryDetailPage() {
           <hr className="border-gray-300" />
 
           <div>
-            <PaginationCardList />
+            <PaginationCardList items={matchedSalons} />
           </div>
         </div>
       </div>

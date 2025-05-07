@@ -2,14 +2,11 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout/Layout';
 import Button from '../components/UI/Button';
-import LocationCard from '../components/UI/LocationCard';
-import { useBarberShop } from '../hooks/useBarberShop';
 import { useCategories } from '../hooks/useCategories';
 import HorizontalCardList from '../components/UI/HorizontalCardList';
 
 
 const HomePage: React.FC = () => {
-  const { nearbyLocations, loading } = useBarberShop('');
   const categories = useCategories();
 
   return (

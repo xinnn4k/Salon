@@ -6,20 +6,24 @@ import BarberImage2 from '../../assets/barbershop2.png';
 import BeautySalon from '../../assets/beauty salon.png';
 import EyeSalons from '../../assets/eye_salon.png';
 import HairSalon from '../../assets/hair_salon.png';
-
+import { useCardData } from '../../hooks/useSalonData';
 
 
 const HorizontalCardList: React.FC = () => {
   const [isGridView, setIsGridView] = useState(false);
   const navigate = useNavigate();
 
-  const cardData = [
-    { id: 1, name: 'Barbershop One', rating: 4.5, location: 'Натур', type: 'Үсчин', imageUrl: BarberImage1 },
-    { id: 2, name: 'Beauty Salon', rating: 4.2, location: 'Маршал таун', type: 'Гоо сайхан', imageUrl: BeautySalon },
-    { id: 3, name: 'Hair Salon', rating: 4.8, location: 'Зайсан', type: 'Үсчин', imageUrl: HairSalon },
-    { id: 4, name: 'Barbershop Two', rating: 4.3, location: 'Яармаг', type: 'Үсчин', imageUrl: BarberImage2 },
-    { id: 5, name: 'Eyebrow Specialist', rating: 4.7, location: 'Жуков', type: 'Гоо сайхан', imageUrl: EyeSalons },
-  ];
+  const cardDatas = useCardData();
+
+  const cardData = cardDatas.map((card: { id: any; name: any; rating: any; location: any; imageUrl: any; }) => ({
+    id: card.id,
+    name: card.name,
+    rating: card.rating,
+    location: card.location,
+    type: card.name,
+    imageUrl: card.imageUrl,
+  }));
+
 
   const handleCardClick = (card: any) => {
     

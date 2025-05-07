@@ -1,43 +1,26 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import React, { useState } from 'react';
-import BarberImage1 from '../../assets/barbershop.png';
-import BarberImage2 from '../../assets/barbershop2.png';
-import BeautySalon from '../../assets/beauty salon.png';
-import EyeSalons from '../../assets/eye_salon.png';
-import HairSalon from '../../assets/hair_salon.png';
+import React, { useState, useEffect } from 'react';
+import { useCardData } from '../../hooks/useSalonData';
 
-interface PaginationCardListProps {}
+interface PaginationCardListProps {
+  items: {
+    id: number;
+    name: string;
+    rating: number;
+    location: string;
+    type: string;
+    imageUrl: string;
+  }[];
+}
 
-const PaginationCardList: React.FC<PaginationCardListProps> = () => {
+
+const PaginationCardList: React.FC<PaginationCardListProps> = ({ items }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const navigate = useNavigate();
   const { subcategoryId } = useParams<{ subcategoryId: string }>();
   const itemsPerPage = 6;
 
-  const cardData = [
-    { id: 1, name: 'Barbershop One', rating: 4.5, location: 'Натур', type: 'Үсчин', imageUrl: BarberImage1 },
-    { id: 2, name: 'Beauty Salon', rating: 4.2, location: 'Маршал таун', type: 'Гоо сайхан', imageUrl: BeautySalon },
-    { id: 3, name: 'Hair Salon', rating: 4.8, location: 'Зайсан', type: 'Үсчин', imageUrl: HairSalon },
-    { id: 4, name: 'Barbershop Two', rating: 4.3, location: 'Яармаг', type: 'Үсчин', imageUrl: BarberImage2 },
-    { id: 5, name: 'Eyebrow Specialist', rating: 4.7, location: 'Жуков', type: 'Гоо сайхан', imageUrl: EyeSalons },
-    { id: 6, name: 'New Haircut', rating: 4.6, location: 'Баянмонгол', type: 'Үсчин', imageUrl: BarberImage1 },
-    { id: 7, name: 'Luxury Spa', rating: 4.9, location: 'Төв цэнгэлдэх', type: 'Гоо сайхан', imageUrl: BeautySalon },
-  ];
-
-  // Define services for each salon - in a real app, you would fetch this from an API
-  const serviceData = {
-    1: [
-      { id: 1, name: "Haircut", duration: "30 min", price: "25,000₮" },
-      { id: 2, name: "Hair Styling", duration: "45 min", price: "35,000₮" },
-      { id: 3, name: "Beard Trim", duration: "15 min", price: "15,000₮" }
-    ],
-    2: [
-      { id: 1, name: "Facial", duration: "30 min", price: "40,000₮" },
-      { id: 2, name: "Manicure", duration: "40 min", price: "30,000₮" },
-      { id: 3, name: "Pedicure", duration: "50 min", price: "35,000₮" }
-    ],
-    // Add more for other salons as needed
-  };
+  const cardData = items;
 
   const totalPages = Math.ceil(cardData.length / itemsPerPage);
 
@@ -51,17 +34,15 @@ const PaginationCardList: React.FC<PaginationCardListProps> = () => {
   );
 
   const handleCardClick = (card: any) => {
-    
     const baseUrl = `/salon/${card.id}`;
-    
+
     if (subcategoryId) {
-      const serviceId = serviceData[card.id as keyof typeof serviceData]?.[0]?.id || 1;
-      navigate(`${baseUrl}/services/${serviceId}`);
+      navigate(`/salon/${card.id}/services/${subcategoryId}`);
     } else {
       navigate(baseUrl);
     }
   };
-  
+
   return (
     <div className="max-w-screen-xl mx-auto px-4 py-8">
       <h2 className="text-2xl font-bold mb-6">Дараах газруудаас сонгоод захиалгаа хийгээрэй!</h2>
