@@ -4,6 +4,8 @@ import Layout from '../components/Layout/Layout';
 import Button from '../components/UI/Button';
 import { useCategories } from '../hooks/useCategories';
 import HorizontalCardList from '../components/UI/HorizontalCardList';
+import { Calendar, MapPin, Search } from 'lucide-react';
+import SearchSection from '../components/UI/SearchSection';
 
 
 const HomePage: React.FC = () => {
@@ -21,41 +23,8 @@ const HomePage: React.FC = () => {
             Гоо сайхны шилдэг үйлчилгээ үзүүлэгчдээс цагаа шууд захиал.
             </p>
             
-            <div className="bg-white rounded-xl sm:mx-auto md:mx-28 lg:mx-0 p-3 shadow-lg">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                <div className="md:col-span-2 lg:col-span-1" >
-                  <input
-                    type="text"
-                    placeholder="Бүх үйлчилгээ, салон"
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
-                  />
-                </div>
-                <div className="md:col-span-2 lg:col-span-1">
-                  <input
-                    type="text"
-                    placeholder="Байршил"
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
-                  />
-                </div>
-                <div className="md:col-span-1 lg:col-span-1">
-                  <input
-                    type="text"
-                    placeholder="Огноо"
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
-                  />
-                </div>
-                <div className="md:col-span-1 lg:col-span-1">
-                  <input
-                    type="text"
-                    placeholder="Цаг"
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
-                  />
-                </div>
-                <div className="flex items-end rounded-3xl md:col-span-2 lg:col-span-1 flex justify-center">
-                  <Button fullWidth className="bg-purple-500 hover:bg-purple-700 text-white">Хайх</Button>
-                </div>
-              </div>
-            </div>
+            <SearchSection/>
+
           </div>
         </div>
       </section>
@@ -87,8 +56,34 @@ const HomePage: React.FC = () => {
           <HorizontalCardList />
         </div>
       </section>
-      
-
+      <section className="py-16">
+        <div className="max-w-screen-xl mx-auto px-4">
+          <h2 className="text-2xl font-bold text-center mb-12">Яагаад бидний үйлчилгээг сонгох вэ?</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="text-center p-6 rounded-lg hover:shadow-md transition-shadow">
+              <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Calendar className="text-purple-500" size={24} />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Цагийн хуваарь</h3>
+              <p className="text-gray-600">24/7 онлайн захиалга хийх боломжтой, таны цагийг хэмнэнэ.</p>
+            </div>
+            <div className="text-center p-6 rounded-lg hover:shadow-md transition-shadow">
+              <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Search className="text-purple-500" size={24} />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Хялбар хайлт</h3>
+              <p className="text-gray-600">Таны хэрэгцээнд тохирсон мэргэжилтнийг олоход хялбар.</p>
+            </div>
+            <div className="text-center p-6 rounded-lg hover:shadow-md transition-shadow">
+              <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <MapPin className="text-purple-500" size={24} />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Ойрхон байршил</h3>
+              <p className="text-gray-600">Таны байршилд ойрхон үйлчилгээ үзүүлэгчдийг олоорой.</p>
+            </div>
+          </div>
+        </div>
+      </section>
     </Layout>
   );
 };

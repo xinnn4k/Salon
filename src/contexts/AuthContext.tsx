@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 
 interface User {
   id: string;
@@ -13,6 +13,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -22,6 +23,7 @@ const AuthContext = createContext<AuthContextType>({
   login: async () => {},
   logout: () => {},
   isAuthenticated: false,
+  clearError: () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -38,10 +40,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userData = localStorage.getItem('user');
         
         if (token && userData) {
-          setUser(JSON.parse(userData));
+
+          const tokenData = JSON.parse(atob(token.split('.')[1]));
+          const isExpired = tokenData.exp * 1000 < Date.now();
+          
+          if (isExpired) {
+
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('user');
+            setUser(null);
+          } else {
+            setUser(JSON.parse(userData));
+          }
         }
       } catch (error) {
         console.error('Authentication error:', error);
+
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
       } finally {
         setLoading(false);
       }
@@ -50,37 +66,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkAuth();
   }, []);
 
-  const login = async (email: string, password: string) => {
-    setLoading(true);
-    setError(null);
-  
-    try {
-      const storedUser = localStorage.getItem('signupUser');
-      if (!storedUser) throw new Error('No user found. Please sign up first.');
-  
-      const parsedUser = JSON.parse(storedUser);
-      
-      if (email === parsedUser.email && password === parsedUser.password) {
-        const mockToken = 'mock-jwt-token-' + Math.random();
-        localStorage.setItem('authToken', mockToken);
-        localStorage.setItem('user', JSON.stringify(parsedUser));
-        setUser(parsedUser);
-      } else {
-        throw new Error('Email or password is incorrect');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-  
+const login = async (email: string, password: string) => {
+  setLoading(true);
+  setError(null);
 
-  const logout = () => {
+  try {
+    if (!email || !password) {
+      throw new Error('Email and password are required');
+    }
+
+    if (!email.includes('@')) {
+      throw new Error('Please enter a valid email address');
+    }
+
+    const storedUsers = localStorage.getItem('users');
+    if (!storedUsers) throw new Error('No users found. Please sign up first.');
+
+    const parsedUsers = JSON.parse(storedUsers);
+
+    const matchedUser = parsedUsers.find((user: any) => 
+      user.email === email && user.password === password
+    );
+
+    if (matchedUser) {
+      const exp = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const tokenPayload = { 
+        sub: matchedUser.id, 
+        email: matchedUser.email,
+        exp
+      };
+      const mockToken = `mock.${btoa(JSON.stringify(tokenPayload))}.signature`;
+
+      localStorage.setItem('authToken', mockToken);
+      localStorage.setItem('user', JSON.stringify(matchedUser));
+      setUser(matchedUser);
+    } else {
+      throw new Error('Email or password is incorrect');
+    }
+
+  } catch (err) {
+    setError(err instanceof Error ? err.message : 'Login failed');
+  } finally {
+    setLoading(false);
+  }
+};
+
+  
+  const logout = useCallback(() => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
     setUser(null);
-  };
+  }, []);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
 
   const value = {
     user,
@@ -89,6 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     login,
     logout,
     isAuthenticated: !!user,
+    clearError
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

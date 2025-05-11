@@ -28,10 +28,13 @@ const SignupPage: React.FC = () => {
       password,
     };
 
-    // Save to localStorage
     localStorage.setItem('signupUser', JSON.stringify(userData));
 
-    // Redirect to login page
+
+    const users = JSON.parse(localStorage.getItem("users") || "[]");
+    users.push(userData);
+    localStorage.setItem("users", JSON.stringify(users));
+
     navigate('/login');
   };
 
@@ -55,27 +58,42 @@ const SignupPage: React.FC = () => {
         <h1 className="text-3xl font-bold mb-6">Сайн уу, тавтай морил!</h1>
         <form className="w-full max-w-md" onSubmit={handleSubmit}>
           {error && <p className="text-red-600 mb-2">{error}</p>}
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full p-3 mb-4 border rounded-md"
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full p-3 mb-4 border rounded-md"
-          />
-          <input
-            type="password"
-            placeholder="Repeat password"
-            value={repeatPassword}
-            onChange={(e) => setRepeatPassword(e.target.value)}
-            className="w-full p-3 mb-4 border rounded-md"
-          />
+          <div className="">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+               Имайл
+            </label>
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full p-3 mb-4 border rounded-md"
+            />
+          </div>
+          <div className="">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+              Нууц үг
+            </label>
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full p-3 mb-4 border rounded-md"
+            />
+          </div>
+          <div className="">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+              Нууц үг давтах
+            </label>
+            <input
+              type="password"
+              placeholder="Repeat password"
+              value={repeatPassword}
+              onChange={(e) => setRepeatPassword(e.target.value)}
+              className="w-full p-3 mb-4 border rounded-md"
+            />
+          </div>
           <button type="submit" className="w-full bg-blue-600 text-white p-3 rounded-md font-semibold">
             Бүртгүүлэх
           </button>

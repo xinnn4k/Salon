@@ -64,7 +64,7 @@ const LoginPage: React.FC = () => {
           
           <div className="mb-4">
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-              Email
+               Имайл
             </label>
             <input
               id="email"
@@ -79,7 +79,7 @@ const LoginPage: React.FC = () => {
           
           <div className="mb-6">
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-              Password
+              Нууц үг
             </label>
             <input
               id="password"
@@ -92,7 +92,7 @@ const LoginPage: React.FC = () => {
             />
             <div className="mt-1 text-right">
               <Link to="/forgot-password" className="text-sm text-blue-600 hover:underline">
-                Forgot password?
+                Нууц үгээ мартсан уу?
               </Link>
             </div>
           </div>

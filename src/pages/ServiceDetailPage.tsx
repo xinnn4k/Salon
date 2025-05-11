@@ -4,6 +4,7 @@ import Layout from '../components/Layout/Layout';
 import { Star, Clock, Calendar, User, ChevronDown, CheckCircle, AlertCircle } from 'lucide-react';
 import { FaArrowLeft } from 'react-icons/fa';
 import { useCardData } from '../hooks/useSalonData';
+import { useAuth } from '../contexts/AuthContext'; // Import auth hook - make sure you have this
 
 interface ServiceDetailProps {
     id: string;
@@ -23,6 +24,7 @@ interface StaffMember {
 
 interface BookingDetails {
   bookingId: string;
+  userId: string; // Added userId field
   salonId: string;
   salonName: string;
   serviceId: string;
@@ -64,9 +66,10 @@ const staffData: StaffMember[] = [
 const ServiceDetailPage: React.FC = () => {
   const { salonId, serviceId } = useParams<{ salonId: string; serviceId: string }>();
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
   const [service, setService] = useState<ServiceDetailProps | null>(null);
   const [salonDetails, setSalonDetails] = useState<any>(null);
-  const [staffMembers] = useState<StaffMember[]>(staffData); // Initialize with staffData directly
+  const [staffMembers] = useState<StaffMember[]>(staffData);
   const [selectedStaff, setSelectedStaff] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
@@ -78,13 +81,19 @@ const ServiceDetailPage: React.FC = () => {
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const cardDatas = useCardData();
 
-  // Get existing bookings from localStorage
+  useEffect(() => {
+    if (!isAuthenticated && errorMessage === null) {
+      setErrorMessage("Та үйлчилгээ захиалахын тулд нэвтрэх шаардлагатай");
+    } else if (isAuthenticated && errorMessage === "Та үйлчилгээ захиалахын тулд нэвтрэх шаардлагатай") {
+      setErrorMessage(null);
+    }
+  }, [isAuthenticated, errorMessage]);
+
   const getExistingBookings = (): BookingDetails[] => {
     const bookingsJSON = localStorage.getItem('salonBookings');
     return bookingsJSON ? JSON.parse(bookingsJSON) : [];
   };
   
-  // Save booking to localStorage
   const saveBookingToLocalStorage = (booking: BookingDetails) => {
     const existingBookings = getExistingBookings();
     const updatedBookings = [...existingBookings, booking];
@@ -95,31 +104,33 @@ const ServiceDetailPage: React.FC = () => {
     if (!salonId || !serviceId) return;
     if (!cardDatas || cardDatas.length === 0) return;
   
-    setIsLoading(true);
-    setErrorMessage(null);
+    if (!service && !salonDetails) {
+      setIsLoading(true);
+      setErrorMessage(null);
+      
+      try {
+        const foundSalon = cardDatas.find(s => s.id === Number(salonId));
+        
+        if (!foundSalon) {
+          throw new Error("Salon not found");
+        }
+        
+        const foundService = foundSalon?.services.find(s => s.id === serviceId);
+        
+        if (!foundService) {
+          throw new Error("Service not found");
+        }
     
-    try {
-      const foundSalon = cardDatas.find(s => s.id === Number(salonId));
-      
-      if (!foundSalon) {
-        throw new Error("Salon not found");
+        setSalonDetails(foundSalon);
+        setService(foundService);
+      } catch (error) {
+        setErrorMessage("Мэдээлэл олдсонгүй. Дахин оролдоно уу.");
+        console.error("Error loading data:", error);
+      } finally {
+        setIsLoading(false);
       }
-      
-      const foundService = foundSalon?.services.find(s => s.id === serviceId);
-      
-      if (!foundService) {
-        throw new Error("Service not found");
-      }
-  
-      setSalonDetails(foundSalon);
-      setService(foundService);
-    } catch (error) {
-      setErrorMessage("Мэдээлэл олдсонгүй. Дахин оролдоно уу.");
-      console.error("Error loading data:", error);
-    } finally {
-      setIsLoading(false);
     }
-  }, [salonId, serviceId, cardDatas]);
+  }, [salonId, serviceId, cardDatas, service, salonDetails]);
   
   const getNextDays = () => {
     const days = [];
@@ -141,7 +152,7 @@ const ServiceDetailPage: React.FC = () => {
 
   const availableDates = getNextDays();
 
-  // Reset selection when staff changes
+
   useEffect(() => {
     if (selectedStaff) {
       setSelectedTime('');
@@ -149,6 +160,14 @@ const ServiceDetailPage: React.FC = () => {
   }, [selectedStaff]);
 
   const handleBooking = () => {
+
+    if (!isAuthenticated || !user) {
+      setErrorMessage("Та үйлчилгээ захиалахын тулд нэвтрэх шаардлагатай");
+
+      navigate('/login', { state: { from: `/salon/${salonId}/service/${serviceId}` } });
+      return;
+    }
+
     if (!selectedStaff || !selectedDate || !selectedTime) {
       setErrorMessage("Тавтай морилно уу! Та үйлчилгээний ажилтан, огноо болон цагаа сонгоно уу.");
       return;
@@ -157,11 +176,11 @@ const ServiceDetailPage: React.FC = () => {
     try {
       setIsLoading(true);
       
-      // Generate unique booking ID
       const bookingId = `book-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       
       const bookingDetails: BookingDetails = {
         bookingId: bookingId,
+        userId: user.id,
         salonId: salonId || '',
         salonName: salonDetails?.name || '',
         serviceId: service?.id || '',
@@ -175,15 +194,12 @@ const ServiceDetailPage: React.FC = () => {
         status: 'pending'
       };
       
-      // Save to localStorage
       saveBookingToLocalStorage(bookingDetails);
       
       console.log("Захиалгын дэлгэрэнгүй:", bookingDetails);
       
-      // Set booking success first, then navigate after a short delay
       setBookingSuccess(true);
       
-      // Navigate after a short delay to allow the success message to be seen
       setTimeout(() => {
         navigate(`/payment/${bookingId}`);
       }, 1000);
@@ -195,11 +211,9 @@ const ServiceDetailPage: React.FC = () => {
     }
   };
 
-  // Check time availability (simulate checking against existing bookings)
   const isTimeAvailable = (time: string) => {
     const existingBookings = getExistingBookings();
     
-    // Check if there's already a booking with the same staff, date and time
     const conflictingBooking = existingBookings.find(booking => 
       booking.staffId === selectedStaff && 
       booking.date === selectedDate && 
@@ -307,6 +321,19 @@ const ServiceDetailPage: React.FC = () => {
               {errorMessage}
             </div>
           )}
+
+          {!isAuthenticated && (
+            <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-lg">
+              <h3 className="font-medium mb-2">Цаг захиалах</h3>
+              <p className="mb-3">Та үйлчилгээ захиалахын тулд нэвтрэх шаардлагатай.</p>
+              <button 
+                onClick={() => navigate('/login', { state: { from: `/salon/${salonId}/service/${serviceId}` } })}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-colors"
+              >
+                Нэвтрэх
+              </button>
+            </div>
+          )}
           
           {/* Select Staff */}
           <div className="mb-6">
@@ -315,12 +342,15 @@ const ServiceDetailPage: React.FC = () => {
             </label>
             <div className="relative">
               <button
-                className="w-full flex items-center justify-between bg-white border border-gray-300 rounded-lg px-4 py-3 text-left focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full flex items-center justify-between bg-white border border-gray-300 rounded-lg px-4 py-3 text-left focus:outline-none focus:ring-2 focus:ring-blue-500 ${!isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => {
-                  setShowStaffDropdown(!showStaffDropdown);
-                  setShowDateDropdown(false);
-                  setShowTimeDropdown(false);
+                  if (isAuthenticated) {
+                    setShowStaffDropdown(!showStaffDropdown);
+                    setShowDateDropdown(false);
+                    setShowTimeDropdown(false);
+                  }
                 }}
+                disabled={!isAuthenticated}
               >
                 <div className="flex items-center">
                   <User size={18} className="text-gray-400 mr-2" />
@@ -367,15 +397,15 @@ const ServiceDetailPage: React.FC = () => {
             </label>
             <div className="relative">
               <button
-                className={`w-full flex items-center justify-between bg-white border border-gray-300 rounded-lg px-4 py-3 text-left focus:outline-none focus:ring-2 focus:ring-blue-500 ${!selectedStaff ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`w-full flex items-center justify-between bg-white border border-gray-300 rounded-lg px-4 py-3 text-left focus:outline-none focus:ring-2 focus:ring-blue-500 ${!selectedStaff || !isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => {
-                  if (selectedStaff) {
+                  if (selectedStaff && isAuthenticated) {
                     setShowDateDropdown(!showDateDropdown);
                     setShowStaffDropdown(false);
                     setShowTimeDropdown(false);
                   }
                 }}
-                disabled={!selectedStaff}
+                disabled={!selectedStaff || !isAuthenticated}
               >
                 <div className="flex items-center">
                   <Calendar size={18} className="text-gray-400 mr-2" />
@@ -413,15 +443,15 @@ const ServiceDetailPage: React.FC = () => {
             </label>
             <div className="relative">
               <button
-                className={`w-full flex items-center justify-between bg-white border border-gray-300 rounded-lg px-4 py-3 text-left focus:outline-none focus:ring-2 focus:ring-blue-500 ${!selectedStaff || !selectedDate ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`w-full flex items-center justify-between bg-white border border-gray-300 rounded-lg px-4 py-3 text-left focus:outline-none focus:ring-2 focus:ring-blue-500 ${!selectedStaff || !selectedDate || !isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => {
-                  if (selectedStaff && selectedDate) {
+                  if (selectedStaff && selectedDate && isAuthenticated) {
                     setShowTimeDropdown(!showTimeDropdown);
                     setShowStaffDropdown(false);
                     setShowDateDropdown(false);
                   }
                 }}
-                disabled={!selectedStaff || !selectedDate}
+                disabled={!selectedStaff || !selectedDate || !isAuthenticated}
               >
                 <div className="flex items-center">
                   <Clock size={18} className="text-gray-400 mr-2" />
@@ -489,12 +519,12 @@ const ServiceDetailPage: React.FC = () => {
           {/* Book Button */}
           <button
             className={`w-full py-3 font-medium rounded-lg transition-colors ${
-              selectedStaff && selectedDate && selectedTime
+              selectedStaff && selectedDate && selectedTime && isAuthenticated
                 ? 'bg-blue-600 text-white hover:bg-blue-700'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
             onClick={handleBooking}
-            disabled={!selectedStaff || !selectedDate || !selectedTime || isLoading}
+            disabled={!selectedStaff || !selectedDate || !selectedTime || isLoading || !isAuthenticated}
           >
             {isLoading ? (
               <div className="flex items-center justify-center">

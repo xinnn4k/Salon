@@ -42,7 +42,6 @@ const PaymentPage: React.FC<PaymentPageProps> = () => {
       return;
     }
 
-    // Get booking details from localStorage
     const fetchBookingDetails = () => {
       try {
         const bookingsJSON = localStorage.getItem('salonBookings');
@@ -70,11 +69,10 @@ const PaymentPage: React.FC<PaymentPageProps> = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
     
-    // Format card number with spaces
     if (name === 'cardNumber') {
-      // Remove non-digit characters
+
       const digitsOnly = value.replace(/\D/g, '');
-      // Add spaces every 4 digits
+
       let formattedValue = '';
       for (let i = 0; i < digitsOnly.length; i++) {
         if (i > 0 && i % 4 === 0) {
@@ -82,7 +80,7 @@ const PaymentPage: React.FC<PaymentPageProps> = () => {
         }
         formattedValue += digitsOnly[i];
       }
-      // Limit to 19 characters (16 digits + 3 spaces)
+
       const limitedValue = formattedValue.slice(0, 19);
       
       setPaymentDetails(prev => ({
@@ -92,7 +90,7 @@ const PaymentPage: React.FC<PaymentPageProps> = () => {
       return;
     }
     
-    // Format expiry date (MM/YY)
+
     if (name === 'expiryDate') {
       const digitsOnly = value.replace(/\D/g, '');
       let formattedValue = digitsOnly;
@@ -126,7 +124,7 @@ const PaymentPage: React.FC<PaymentPageProps> = () => {
 
   const validatePaymentDetails = () => {
     if (paymentMethod === 'qpay') {
-      return true; // No validation needed for QR payment
+      return true;
     }
     
     // Card payment validation
@@ -179,14 +177,11 @@ const PaymentPage: React.FC<PaymentPageProps> = () => {
     setIsLoading(true);
     setErrorMessage(null);
     
-    // Simulate payment processing
     setTimeout(() => {
       try {
-        // Get existing bookings
         const bookingsJSON = localStorage.getItem('salonBookings');
         const bookings = bookingsJSON ? JSON.parse(bookingsJSON) : [];
         
-        // Update booking status
         const updatedBookings = bookings.map((booking: any) => {
           if (booking.bookingId === bookingId) {
             return {
@@ -194,7 +189,7 @@ const PaymentPage: React.FC<PaymentPageProps> = () => {
               status: 'confirmed',
               paymentMethod: paymentMethod,
               paymentDate: new Date().toISOString(),
-              // Save last 4 digits only for security
+
               cardLastFour: paymentMethod === 'card' ? 
                 paymentDetails.cardNumber.replace(/\s/g, '').slice(-4) : null
             };
@@ -202,13 +197,10 @@ const PaymentPage: React.FC<PaymentPageProps> = () => {
           return booking;
         });
         
-        // Save updated bookings
         localStorage.setItem('salonBookings', JSON.stringify(updatedBookings));
         
-        // Payment successful
         setPaymentSuccess(true);
         
-        // Redirect after a delay
         setTimeout(() => {
           navigate('/bookings');
         }, 3000);
@@ -218,7 +210,7 @@ const PaymentPage: React.FC<PaymentPageProps> = () => {
       } finally {
         setIsLoading(false);
       }
-    }, 2000); // Simulate processing delay
+    }, 2000);
   };
 
   if (isLoading && !bookingDetails) {

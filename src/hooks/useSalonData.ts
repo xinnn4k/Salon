@@ -25,7 +25,6 @@ type Card = {
 export const useCardData = (): Card[] => {
   const categories = useCategories();
   
-  // Use useMemo to prevent recreating the card data on every render
   const cardData = useMemo(() => {
     const getSubcategoryById = (id: string) => {
       for (const cat of categories) {
@@ -108,7 +107,7 @@ export const useCardData = (): Card[] => {
         ]
       }
     ];
-  }, [categories]); // Only recalculate when categories change
+  }, [categories]);
 
   return cardData;
 };
