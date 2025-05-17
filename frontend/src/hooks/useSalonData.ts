@@ -43,7 +43,7 @@ export const useCardData = (): Card[] => {
     return [
       {
         id: 1,
-        name: 'Barbershop One',
+        name: 'Barbershop One',  
         rating: 4.5,
         location: 'Натур',
         type: 'Үсчин',
