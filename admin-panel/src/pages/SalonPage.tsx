@@ -30,6 +30,8 @@ const SalonPage: React.FC = () => {
   const [name, setName] = useState<string>('');
   const [location, setLocation] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [image, setImage] = useState<File | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -81,7 +83,7 @@ const SalonPage: React.FC = () => {
         
         // If salon has image, set preview
         if (salon.image) {
-          setPreviewImage(`data:image/jpeg;base64,${salon.image}`);
+          setPreviewImage(salon.image);
         }
       }
     }
@@ -105,12 +107,13 @@ const SalonPage: React.FC = () => {
   };
 
   const validateForm = () => {
-    if (!name || !location || !phone) {
+    if (!name || !location || !phone || (modalType === ModalType.Create && !password)) {
       setError('Please fill in all required fields');
       return false;
     }
     return true;
   };
+
 
   const handleCreate = async () => {
     if (!validateForm()) return;
@@ -125,7 +128,9 @@ const SalonPage: React.FC = () => {
       if (image) {
         formData.append('image', image);
       }
-      
+      formData.append('email', email);
+      formData.append('password', password);
+
       const response = await fetch('http://localhost:4000/api/salons', {
         method: 'POST',
         body: formData,
@@ -155,8 +160,13 @@ const SalonPage: React.FC = () => {
       formData.append('name', name);
       formData.append('location', location);
       formData.append('phone', phone);
-      
-      // Only append image if a new one was selected
+      if (email) {
+        formData.append('email', email);
+      }
+      if (password) {
+        formData.append('password', password);
+      }
+
       if (image) {
         formData.append('image', image);
       }
@@ -218,8 +228,8 @@ const SalonPage: React.FC = () => {
       return 0;
     });
 
-  // Renders action buttons for each salon
-  const renderActionButtons = (salon: Salon) => (
+
+    const renderActionButtons = (salon: Salon) => (
     <div className="flex space-x-2">
       <button 
         onClick={() => openModal(ModalType.Edit, salon)}
@@ -310,7 +320,6 @@ const SalonPage: React.FC = () => {
           </div>
         </div>
         
-        {/* Display error message if any */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded mb-6 transition-all duration-300">
             <div className="flex">
@@ -412,7 +421,7 @@ const SalonPage: React.FC = () => {
                     <div className="flex-shrink-0 h-20 w-20 rounded overflow-hidden bg-gray-100">
                       {salon.image ? (
                         <img 
-                          src={`data:image/jpeg;base64,${salon.image}`} 
+                          src={salon.image} 
                           alt={salon.name} 
                           className="h-full w-full object-cover transition-transform duration-500 hover:scale-110"
                         />
@@ -539,7 +548,34 @@ const SalonPage: React.FC = () => {
                     required
                   />
                 </div>
-                
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                    Email *
+                  </label>
+                  <input
+                    type="email"
+                    id="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="mt-1 block w-full border border-gray-300 rounded shadow-sm py-2.5 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                    {modalType === ModalType.Edit ? 'Password (leave blank to keep existing)' : 'Password *'}
+                  </label>
+                  <input
+                    type="password"
+                    id="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="mt-1 block w-full border border-gray-300 rounded shadow-sm py-2.5 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
+                    required={modalType === ModalType.Create}
+                  />
+                </div>
+
                 <div>
                   <label htmlFor="location" className="block text-sm font-medium text-gray-700">
                     Location *

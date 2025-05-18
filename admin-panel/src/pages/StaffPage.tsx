@@ -1,9 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Staff } from '../types';
 
-const API_URL = 'http://localhost:4000/api';
 
 const StaffPage: React.FC = () => {
   const { salonId } = useParams<{ salonId: string }>();
@@ -17,9 +15,12 @@ const StaffPage: React.FC = () => {
   
   // Form state
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [specialty, setSpecialty] = useState('');
   const [image, setImage] = useState<File | null>(null);
   const [keepExistingImage, setKeepExistingImage] = useState(true);
+  const [passwordChanged, setPasswordChanged] = useState(false);
 
   useEffect(() => {
     if (salonId) {
@@ -32,7 +33,7 @@ const StaffPage: React.FC = () => {
     
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/staffs/${salonId}`);
+      const response = await fetch(`http://localhost:4000/api/staffs/${salonId}`);
       if (!response.ok) {
         throw new Error('Failed to fetch staff');
       }
@@ -48,9 +49,12 @@ const StaffPage: React.FC = () => {
 
   const resetForm = () => {
     setName('');
+    setEmail('');
+    setPassword('');
     setSpecialty('');
     setImage(null);
     setKeepExistingImage(true);
+    setPasswordChanged(false);
     setIsEditMode(false);
     setSelectedStaffId(null);
   };
@@ -64,9 +68,12 @@ const StaffPage: React.FC = () => {
     setIsEditMode(true);
     setSelectedStaffId(member._id);
     setName(member.name);
+    setEmail(member.email || '');
+    setPassword(''); // Don't populate password for security
     setSpecialty(member.specialty);
     setImage(null);
     setKeepExistingImage(true);
+    setPasswordChanged(false);
     setIsModalOpen(true);
   };
 
@@ -82,15 +89,20 @@ const StaffPage: React.FC = () => {
     try {
       const formData = new FormData();
       formData.append('name', name);
+      formData.append('email', email);
       formData.append('specialty', specialty);
       
       if (isEditMode) {
-        // Update existing staff
+
+        if (password && passwordChanged) {
+          formData.append('password', password);
+        }
+        
         if (image) {
           formData.append('image', image);
         }
         
-        const response = await fetch(`${API_URL}/staffs/${selectedStaffId}`, {
+        const response = await fetch(`http://localhost:4000/api/staffs/${selectedStaffId}`, {
           method: 'PUT',
           body: formData,
         });
@@ -99,13 +111,15 @@ const StaffPage: React.FC = () => {
           throw new Error('Failed to update staff');
         }
       } else {
-        // Create new staff
+
+        formData.append('password', password);
         formData.append('salonId', salonId);
+        
         if (image) {
           formData.append('image', image);
         }
         
-        const response = await fetch(`${API_URL}/staffs/${salonId}`, {
+        const response = await fetch(`http://localhost:4000/api/staffs/${salonId}`, {
           method: 'POST',
           body: formData,
         });
@@ -115,7 +129,6 @@ const StaffPage: React.FC = () => {
         }
       }
       
-      // Reset form and close modal
       closeModal();
       loadStaff();
     } catch (err) {
@@ -125,7 +138,7 @@ const StaffPage: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      const response = await fetch(`${API_URL}/staffs/${id}`, {
+      const response = await fetch(`http://localhost:4000/api/staffs/${id}`, {
         method: 'DELETE',
       });
       
@@ -178,6 +191,9 @@ const StaffPage: React.FC = () => {
                 )}
                 <div className="p-6">
                   <h2 className="text-xl font-semibold mb-2">{member.name}</h2>
+                  <p className="text-gray-600 mb-2">
+                    <span className="font-medium">Email:</span> {member.email}
+                  </p>
                   <p className="text-gray-600 mb-4">
                     <span className="font-medium">Specialty:</span> {member.specialty}
                   </p>
@@ -250,6 +266,37 @@ const StaffPage: React.FC = () => {
                   onChange={(e) => setName(e.target.value)}
                   className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                   required
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-gray-700 text-sm font-bold mb-2">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  required
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-gray-700 text-sm font-bold mb-2">
+                  {isEditMode ? 'Password (leave blank to keep unchanged)' : 'Password'}
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (isEditMode && e.target.value) {
+                      setPasswordChanged(true);
+                    }
+                  }}
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  required={!isEditMode}
                 />
               </div>
               

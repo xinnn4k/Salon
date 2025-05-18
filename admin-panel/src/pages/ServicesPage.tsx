@@ -8,6 +8,20 @@ interface Service {
   description: string;
   image?: string;
   salonId: string;
+  categoryId?: string;
+}
+
+interface Category {
+  _id: string;
+  name: string;
+  description: string;
+  subcategories: Subcategory[];
+}
+
+interface Subcategory {
+  _id: string;
+  name: string;
+  description: string;
 }
 
 interface ServiceFormData {
@@ -15,6 +29,8 @@ interface ServiceFormData {
   price: string;
   description: string;
   image: File | null;
+  categoryId: string;
+  subcategoryId: string;
 }
 
 const API_URL = 'http://localhost:4000/api';
@@ -22,18 +38,22 @@ const API_URL = 'http://localhost:4000/api';
 const ServicesPage: React.FC = () => {
   const { salonId } = useParams<{ salonId: string }>();
   const [services, setServices] = useState<Service[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [currentServiceId, setCurrentServiceId] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   
   // Form state
   const initialFormState: ServiceFormData = {
     name: '',
     price: '',
     description: '',
-    image: null
+    image: null,
+    categoryId: '',
+    subcategoryId: ''
   };
   
   const [formData, setFormData] = useState<ServiceFormData>(initialFormState);
@@ -41,9 +61,11 @@ const ServicesPage: React.FC = () => {
   useEffect(() => {
     if (salonId) {
       loadServices();
+      loadCategories();
     }
   }, [salonId]);
 
+  // Load services for the salon
   const loadServices = async () => {
     if (!salonId) return;
     
@@ -63,9 +85,31 @@ const ServicesPage: React.FC = () => {
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  // Load all available categories
+  const loadCategories = async () => {
+    try {
+      const response = await fetch(`${API_URL}/categories`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch categories');
+      }
+      const data = await response.json();
+      setCategories(data);
+    } catch (err) {
+      setError('Failed to load categories');
+    }
+  };
+  
+  // Handle form input changes
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // If the category changes, update the selected category and reset subcategory
+    if (name === 'categoryId') {
+      const category = categories.find(cat => cat._id === value) || null;
+      setSelectedCategory(category);
+      setFormData(prev => ({ ...prev, subcategoryId: '' }));
+    }
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -73,10 +117,28 @@ const ServicesPage: React.FC = () => {
     setFormData(prev => ({ ...prev, image: file }));
   };
 
+  // Handle selecting a pre-defined service from a category
+  const handleServiceSelection = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const serviceId = e.target.value;
+    if (serviceId && selectedCategory) {
+      // If a subcategory is selected
+      const subcategory = selectedCategory.subcategories.find(sub => sub._id === serviceId);
+      if (subcategory) {
+        setFormData(prev => ({
+          ...prev,
+          name: subcategory.name,
+          description: subcategory.description,
+          subcategoryId: serviceId
+        }));
+      }
+    }
+  };
+
   const resetForm = () => {
     setFormData(initialFormState);
     setIsEditMode(false);
     setCurrentServiceId(null);
+    setSelectedCategory(null);
   };
 
   const openCreateModal = () => {
@@ -89,8 +151,16 @@ const ServicesPage: React.FC = () => {
       name: service.name,
       price: service.price.toString(),
       description: service.description,
-      image: null
+      image: null,
+      categoryId: service.categoryId || '',
+      subcategoryId: ''
     });
+    
+    if (service.categoryId) {
+      const category = categories.find(cat => cat._id === service.categoryId) || null;
+      setSelectedCategory(category);
+    }
+    
     setCurrentServiceId(service._id);
     setIsEditMode(true);
     setIsModalOpen(true);
@@ -110,6 +180,15 @@ const ServicesPage: React.FC = () => {
       formDataObj.append('name', formData.name);
       formDataObj.append('price', formData.price);
       formDataObj.append('description', formData.description);
+      
+      if (formData.categoryId) {
+        formDataObj.append('categoryId', formData.categoryId);
+      }
+      
+      if (formData.subcategoryId) {
+        formDataObj.append('subcategoryId', formData.subcategoryId);
+      }
+      
       if (formData.image) {
         formDataObj.append('image', formData.image);
       }
@@ -241,6 +320,49 @@ const ServicesPage: React.FC = () => {
             </div>
             
             <form onSubmit={handleSubmit}>
+              {/* Category Selection */}
+              <div className="mb-4">
+                <label className="block text-gray-700 text-sm font-bold mb-2">
+                  Service Category
+                </label>
+                <select
+                  name="categoryId"
+                  value={formData.categoryId}
+                  onChange={handleInputChange}
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                >
+                  <option value="">Select a category</option>
+                  {categories.map(category => (
+                    <option key={category._id} value={category._id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* Subcategory/Predefined Service Selection */}
+              {selectedCategory && selectedCategory.subcategories.length > 0 && (
+                <div className="mb-4">
+                  <label className="block text-gray-700 text-sm font-bold mb-2">
+                    Choose Predefined Service (Optional)
+                  </label>
+                  <select
+                    name="subcategoryId"
+                    value={formData.subcategoryId}
+                    onChange={handleServiceSelection}
+                    className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  >
+                    <option value="">Custom Service</option>
+                    {selectedCategory.subcategories.map(subcategory => (
+                      <option key={subcategory._id} value={subcategory._id}>
+                        {subcategory.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              
+              {/* Service Details */}
               <div className="mb-4">
                 <label className="block text-gray-700 text-sm font-bold mb-2">
                   Name

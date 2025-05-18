@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-// Get all salons
+ 
 router.get('/', async (req, res) => {
     try {
         const salons = await Salon.find();
@@ -27,7 +27,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Get a single salon by ID
+
 router.get('/:id', async (req, res) => {
     try {
         if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -53,56 +53,86 @@ router.get('/:id', async (req, res) => {
 });
 
 
-// Create a new salon
+
 router.post('/', upload.single('image'), async (req, res) => {
-    try {
-        const salon = new Salon({
-            name: req.body.name,
-            location: req.body.location,
-            phone: req.body.phone,
-            image: req.file ? req.file.buffer : undefined,
-        });
+  try {
+    const { name, location, phone, email, password } = req.body;
 
-        await salon.save();
-
-        res.status(200).json({ message: 'Salon created successfully', salon });
-    } catch (err) {
-        res.status(500).json({ message: 'Error uploading salon', error: err.message });
+    if (!name || !location || !phone || !email || !password) {
+      return res.status(400).json({ message: 'All fields are required' });
     }
+
+    const existingSalon = await Salon.findOne({ email });
+    if (existingSalon) {
+      return res.status(409).json({ message: 'Email already exists' });
+    }
+
+    const salon = new Salon({
+      name,
+      location,
+      phone,
+      email,
+      password,
+      image: req.file ? req.file.buffer : undefined,
+    });
+
+    await salon.save();
+
+    res.status(201).json({ message: 'Salon created successfully', salon });
+  } catch (err) {
+    console.error('Salon creation error:', err);
+    res.status(500).json({ message: 'Error uploading salon', error: err.message });
+  }
 });
 
-// Update an existing salon
+
 router.put('/:id', upload.single('image'), async (req, res) => {
-    try {
-        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-            return res.status(400).json({ message: 'Invalid salon ID' });
-        }
+  try {
+    const { id } = req.params;
 
-        const salon = await Salon.findById(req.params.id);
-        
-        if (!salon) {
-            return res.status(404).json({ message: 'Salon not found' });
-        }
-        
-        // Update fields
-        salon.name = req.body.name || salon.name;
-        salon.location = req.body.location || salon.location;
-        salon.phone = req.body.phone || salon.phone;
-        
-        // Only update image if a new one is provided
-        if (req.file) {
-            salon.image = req.file.buffer;
-        }
-        
-        await salon.save();
-        
-        res.status(200).json({ message: 'Salon updated successfully', salon });
-    } catch (err) {
-        res.status(500).json({ message: 'Error updating salon', error: err.message });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid salon ID' });
     }
+
+    const salon = await Salon.findById(id);
+    if (!salon) {
+      return res.status(404).json({ message: 'Salon not found' });
+    }
+
+    const { name, location, phone, email, password } = req.body;
+
+    if (name) salon.name = name;
+    if (location) salon.location = location;
+    if (phone) salon.phone = phone;
+    if (email && email !== salon.email) {
+
+        const existingSalon = await Salon.findOne({ email });
+      if (existingSalon && existingSalon._id.toString() !== id) {
+        return res.status(409).json({ message: 'Email already exists' });
+      }
+      salon.email = email;
+    }
+    if(!email) salon.email = salon.email;
+
+
+    if (password) {
+      salon.password = password;
+    }
+
+    if (req.file) {
+      salon.image = req.file.buffer;
+    }
+
+    await salon.save();
+
+    res.status(200).json({ message: 'Salon updated successfully', salon });
+  } catch (err) {
+    console.error('Error updating salon:', err);
+    res.status(500).json({ message: 'Error updating salon', error: err.message });
+  }
 });
 
-// Delete a salon
+
 router.delete('/:id', async (req, res) => {
     try {
         if (!mongoose.Types.ObjectId.isValid(req.params.id)) {

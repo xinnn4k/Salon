@@ -1,4 +1,5 @@
 export interface Salon {
+  email: string;
   _id: string;
   name: string;
   location: string;
@@ -16,6 +17,7 @@ export interface Service {
 }
 
 export interface Staff {
+  email: string;
   _id: string;
   salonId: string;
   name: string;

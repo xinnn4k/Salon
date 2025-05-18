@@ -41,19 +41,16 @@ const Dashboard: React.FC = () => {
       try {
         setLoading(true);
         
-        // Fetch salons
         const salonResponse = await fetch('http://localhost:4000/api/salons/');
         if (!salonResponse.ok) throw new Error('Failed to fetch salons');
         const salonData = await salonResponse.json();
         setSalons(salonData);
         
-        // Fetch all orders to calculate stats
         let allOrders: Order[] = [];
         let servicesCount = 0;
         let staffCount = 0;
         let totalRevenue = 0;
         
-        // For each salon, get orders, services and staff
         await Promise.all(salonData.map(async (salon: Salon) => {
           try {
             const [ordersRes, servicesRes, staffRes] = await Promise.all([
@@ -66,7 +63,6 @@ const Dashboard: React.FC = () => {
               const salonOrders = await ordersRes.json();
               allOrders = [...allOrders, ...salonOrders];
               
-              // Calculate revenue (assuming the orders have service info populated)
               salonOrders.forEach((order: Order) => {
                 if (order.service && order.service.price) {
                   totalRevenue += order.service.price;
