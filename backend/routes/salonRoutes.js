@@ -8,7 +8,9 @@ const mongoose = require('mongoose');
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
- 
+
+
+
 router.get('/', async (req, res) => {
     try {
         const salons = await Salon.find();
@@ -82,13 +84,11 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-
-
 router.post('/', upload.single('image'), async (req, res) => {
   try {
-    const { name, location, phone, email, password } = req.body;
+    const { name, location, coordinates, phone, email, password } = req.body;
 
-    if (!name || !location || !phone || !email || !password) {
+    if (!name || !location || !coordinates || !phone || !email || !password) {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
@@ -100,11 +100,14 @@ router.post('/', upload.single('image'), async (req, res) => {
     const salon = new Salon({
       name,
       location,
+      coordinates,
       phone,
       email,
       password,
       image: req.file ? req.file.buffer : undefined,
     });
+
+    // Add coordinates based on the location
 
     await salon.save();
 
@@ -114,7 +117,6 @@ router.post('/', upload.single('image'), async (req, res) => {
     res.status(500).json({ message: 'Error uploading salon', error: err.message });
   }
 });
-
 
 router.put('/:id', upload.single('image'), async (req, res) => {
   try {
@@ -132,10 +134,15 @@ router.put('/:id', upload.single('image'), async (req, res) => {
     const { name, location, phone, email, password } = req.body;
 
     if (name) salon.name = name;
-    if (location) salon.location = location;
+    
+    // If location was updated, update the coordinates
+    if (location && location !== salon.location) {
+      salon.location = location;
+      await updateSalonCoordinates(salon, location);
+    }
+    
     if (phone) salon.phone = phone;
     if (email && email !== salon.email) {
-
         const existingSalon = await Salon.findOne({ email });
       if (existingSalon && existingSalon._id.toString() !== id) {
         return res.status(409).json({ message: 'Email already exists' });
@@ -143,7 +150,6 @@ router.put('/:id', upload.single('image'), async (req, res) => {
       salon.email = email;
     }
     if(!email) salon.email = salon.email;
-
 
     if (password) {
       salon.password = password;
@@ -162,7 +168,6 @@ router.put('/:id', upload.single('image'), async (req, res) => {
   }
 });
 
-
 router.delete('/:id', async (req, res) => {
     try {
         if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -180,6 +185,37 @@ router.delete('/:id', async (req, res) => {
         res.status(200).json({ message: 'Salon deleted successfully' });
     } catch (err) {
         res.status(500).json({ message: 'Error deleting salon', error: err.message });
+    }
+});
+
+router.post('/update-coordinates', async (req, res) => {
+    try {
+        const salons = await Salon.find({ 
+            $or: [
+                { coordinates: { $exists: false } },
+                { coordinates: null },
+                { 'coordinates.latitude': { $exists: false } },
+                { 'coordinates.longitude': { $exists: false } }
+            ]
+        });
+        
+        const updates = [];
+        
+        for (const salon of salons) {
+            if (salon.location) {
+                await updateSalonCoordinates(salon, salon.location);
+                await salon.save();
+                updates.push({ id: salon._id, name: salon.name });
+            }
+        }
+        
+        res.status(200).json({ 
+            message: `Updated coordinates for ${updates.length} salons`,
+            updates 
+        });
+    } catch (err) {
+        console.error('Error batch updating salon coordinates:', err);
+        res.status(500).json({ message: 'Error updating coordinates', error: err.message });
     }
 });
 

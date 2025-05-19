@@ -28,6 +28,7 @@ export interface Staff {
 }
 
 export interface Order {
+  price: any;
   staff?: Staff;
   _id: string;
   salonId: string;

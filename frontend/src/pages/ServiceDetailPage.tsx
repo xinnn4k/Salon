@@ -89,7 +89,7 @@ const ServiceDetailPage: React.FC = () => {
     if (!salonId) return;
     
     try {
-      const response = await fetch(`http://localhost:4000/api/orders/${salonId}`);
+      const response = await fetch(`http://localhost:4000/api/orders/pay/${salonId}`);
       if (!response.ok) {
         throw new Error("Failed to fetch existing bookings");
       }
@@ -198,8 +198,7 @@ const ServiceDetailPage: React.FC = () => {
         salonId: salonId || '',
         serviceId: serviceId || '',
         staffId: selectedStaff,
-        customerName: user.name || 'Customer',
-        customerPhone:  '',
+        userId: user.id,
         date: selectedDate,
         time: selectedTime,
         status: 'booked',

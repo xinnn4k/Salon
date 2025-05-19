@@ -14,6 +14,17 @@ router.get('/pay/:salonId', async (req, res) => {
     }
 });
 
+router.get('/user/:userId', async (req, res) => {
+    try {
+        const orders = await Order.find({ userId: req.params.userId })
+            .populate('salonId')
+            .populate('serviceId')
+            .populate('staffId');
+        res.json(orders);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 router.get('/:orderId', async (req, res) => {
     try {

@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, MapPin, Phone, X, Loader2, Grid, List, Camera, Building, Trash2, Edit, AlertCircle } from 'lucide-react';
+import { Search, Plus, MapPin, Phone, X, Loader2, Grid, List, Camera, Building, Trash2, Edit, AlertCircle, Compass } from 'lucide-react';
 
 interface Salon {
   _id: string;
   name: string;
   location: string;
+  coordinates?: {
+    longitude: number;
+    latitude: number;
+  };
   phone: string;
+  email?: string;
   image?: string;
 }
 
@@ -29,6 +34,8 @@ const SalonPage: React.FC = () => {
   // Form state
   const [name, setName] = useState<string>('');
   const [location, setLocation] = useState<string>('');
+  const [coordinates, setCoordinates] = useState<{longitude: number; latitude: number} | null>(null);
+  const [isGettingLocation, setIsGettingLocation] = useState<boolean>(false);
   const [phone, setPhone] = useState<string>('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -62,7 +69,10 @@ const SalonPage: React.FC = () => {
   const resetForm = () => {
     setName('');
     setLocation('');
+    setCoordinates(null);
     setPhone('');
+    setEmail('');
+    setPassword('');
     setImage(null);
     setPreviewImage(null);
     setCurrentSalon(null);
@@ -80,6 +90,12 @@ const SalonPage: React.FC = () => {
         setName(salon.name);
         setLocation(salon.location);
         setPhone(salon.phone);
+        if (salon.email) {
+          setEmail(salon.email);
+        }
+        if (salon.coordinates) {
+          setCoordinates(salon.coordinates);
+        }
         
         // If salon has image, set preview
         if (salon.image) {
@@ -107,13 +123,54 @@ const SalonPage: React.FC = () => {
   };
 
   const validateForm = () => {
-    if (!name || !location || !phone || (modalType === ModalType.Create && !password)) {
+    if (!name || !location || !phone || !email || (modalType === ModalType.Create && !password)) {
       setError('Please fill in all required fields');
       return false;
     }
     return true;
   };
 
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setError('Geolocation is not supported by your browser');
+      return;
+    }
+    
+    setIsGettingLocation(true);
+    
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { longitude, latitude } = position.coords;
+        setCoordinates({ longitude, latitude });
+        setIsGettingLocation(false);
+        
+        // Optionally, you could reverse geocode to get a human-readable address
+        // This would require an external API like Google Maps Geocoding API
+      },
+      (error) => {
+        setIsGettingLocation(false);
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            setError("User denied the request for geolocation");
+            break;
+          case error.POSITION_UNAVAILABLE:
+            setError("Location information is unavailable");
+            break;
+          case error.TIMEOUT:
+            setError("The request to get user location timed out");
+            break;
+          default:
+            setError("An unknown error occurred while retrieving location");
+            break;
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 0
+      }
+    );
+  };
 
   const handleCreate = async () => {
     if (!validateForm()) return;
@@ -125,11 +182,17 @@ const SalonPage: React.FC = () => {
       formData.append('name', name);
       formData.append('location', location);
       formData.append('phone', phone);
+      formData.append('email', email);
+      formData.append('password', password);
+      
+      if (coordinates) {
+        formData.append('coordinates[longitude]', coordinates.longitude.toString());
+        formData.append('coordinates[latitude]', coordinates.latitude.toString());
+      }
+      
       if (image) {
         formData.append('image', image);
       }
-      formData.append('email', email);
-      formData.append('password', password);
 
       const response = await fetch('http://localhost:4000/api/salons', {
         method: 'POST',
@@ -140,7 +203,6 @@ const SalonPage: React.FC = () => {
         throw new Error('Failed to create salon');
       }
       
-      // Close modal and reload salons
       closeModal();
       loadSalons();
     } catch (err) {
@@ -160,11 +222,15 @@ const SalonPage: React.FC = () => {
       formData.append('name', name);
       formData.append('location', location);
       formData.append('phone', phone);
-      if (email) {
-        formData.append('email', email);
-      }
+      formData.append('email', email);
+      
       if (password) {
         formData.append('password', password);
+      }
+      
+      if (coordinates) {
+        formData.append('coordinates[longitude]', coordinates.longitude.toString());
+        formData.append('coordinates[latitude]', coordinates.latitude.toString());
       }
 
       if (image) {
@@ -229,7 +295,7 @@ const SalonPage: React.FC = () => {
     });
 
 
-    const renderActionButtons = (salon: Salon) => (
+  const renderActionButtons = (salon: Salon) => (
     <div className="flex space-x-2">
       <button 
         onClick={() => openModal(ModalType.Edit, salon)}
@@ -247,6 +313,10 @@ const SalonPage: React.FC = () => {
       </button>
     </div>
   );
+
+  const formatCoordinates = (coords: {longitude: number; latitude: number}) => {
+    return `${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`;
+  };
 
   return (
     <div className="bg-slate-50 min-h-screen">
@@ -395,6 +465,12 @@ const SalonPage: React.FC = () => {
                     <MapPin size={18} className="text-gray-400 mt-0.5 flex-shrink-0" />
                     <span>{salon.location}</span>
                   </div>
+                  {salon.coordinates && (
+                    <div className="flex items-start space-x-2 text-gray-600 mb-2">
+                      <Compass size={18} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                      <span className="text-xs">{formatCoordinates(salon.coordinates)}</span>
+                    </div>
+                  )}
                   <div className="flex items-start space-x-2 text-gray-600">
                     <Phone size={18} className="text-gray-400 mt-0.5 flex-shrink-0" />
                     <span>{salon.phone}</span>
@@ -441,6 +517,12 @@ const SalonPage: React.FC = () => {
                           <MapPin size={16} className="mr-1.5 text-gray-400" />
                           {salon.location}
                         </div>
+                        {salon.coordinates && (
+                          <div className="mt-2 flex items-center text-sm text-gray-500">
+                            <Compass size={16} className="mr-1.5 text-gray-400" />
+                            <span className="text-xs">{formatCoordinates(salon.coordinates)}</span>
+                          </div>
+                        )}
                         <div className="mt-2 flex items-center text-sm text-gray-500">
                           <Phone size={16} className="mr-1.5 text-gray-400" />
                           {salon.phone}
@@ -591,6 +673,67 @@ const SalonPage: React.FC = () => {
                 </div>
                 
                 <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Coordinates
+                    </label>
+                    <button
+                      type="button"
+                      onClick={getCurrentLocation}
+                      disabled={isGettingLocation}
+                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded bg-blue-50 text-blue-700 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300"
+                    >
+                      {isGettingLocation ? (
+                        <>
+                          <Loader2 size={12} className="animate-spin mr-1" />
+                          Getting location...
+                        </>
+                      ) : (
+                        <>
+                          <Compass size={12} className="mr-1" />
+                          Get Current Location
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="latitude" className="block text-xs text-gray-500">
+                        Latitude
+                      </label>
+                      <input
+                        type="text"
+                        id="latitude"
+                        value={coordinates?.latitude || ''}
+                        onChange={(e) => setCoordinates(prev => ({
+                          longitude: prev?.longitude || 0,
+                          latitude: parseFloat(e.target.value) || 0
+                        }))}
+                        placeholder="e.g. 40.7128"
+                        className="mt-1 block w-full border border-gray-300 rounded shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="longitude" className="block text-xs text-gray-500">
+                        Longitude
+                      </label>
+                      <input
+                        type="text"
+                        id="longitude"
+                        value={coordinates?.longitude || ''}
+                        onChange={(e) => setCoordinates(prev => ({
+                          latitude: prev?.latitude || 0,
+                          longitude: parseFloat(e.target.value) || 0
+                        }))}
+                        placeholder="e.g. -74.0060"
+                        className="mt-1 block w-full border border-gray-300 rounded shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
+                        />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
                   <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
                     Phone Number *
                   </label>
@@ -600,32 +743,41 @@ const SalonPage: React.FC = () => {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     className="mt-1 block w-full border border-gray-300 rounded shadow-sm py-2.5 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
-                    placeholder="(123) 456-7890"
                     required
                   />
                 </div>
               </div>
               
-              <div className="mt-6 flex items-center justify-end space-x-3">
+              {error && (
+                <div className="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
+                  {error}
+                </div>
+              )}
+              
+              <div className="mt-6 flex justify-end space-x-3">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="px-4 py-2.5 border border-gray-300 rounded shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-300"
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-300"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={modalType === ModalType.Create ? handleCreate : handleUpdate}
-                  disabled={isSubmitting || !name || !location || !phone}
-                  className="inline-flex items-center px-4 py-2.5 border border-transparent rounded shadow-sm text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+                  disabled={isSubmitting}
+                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? (
                     <>
                       <Loader2 size={16} className="animate-spin mr-2" />
                       {modalType === ModalType.Create ? 'Creating...' : 'Updating...'}
                     </>
-                  ) : (modalType === ModalType.Create ? 'Create Salon' : 'Update Salon')}
+                  ) : (
+                    <>
+                      {modalType === ModalType.Create ? 'Create Salon' : 'Update Salon'}
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -636,26 +788,21 @@ const SalonPage: React.FC = () => {
       {/* Delete Confirmation Modal */}
       {modalType === ModalType.Delete && currentSalon && (
         <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div 
-            className="bg-white rounded-lg shadow-2xl max-w-md w-full border border-gray-100"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full border border-gray-100 overflow-hidden">
             <div className="p-6">
-              <div className="flex items-center justify-center flex-col text-center">
-                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
-                  <Trash2 size={24} className="text-red-500" />
-                </div>
-                <h3 className="text-lg font-medium text-gray-900">Delete Salon</h3>
-                <p className="mt-2 text-sm text-gray-500">
-                  Are you sure you want to delete <strong>{currentSalon.name}</strong>? This action cannot be undone.
-                </p>
+              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-100 mx-auto mb-4">
+                <AlertCircle className="h-6 w-6 text-red-500" />
               </div>
+              <h3 className="text-lg font-medium text-center text-gray-900 mb-2">Delete Salon</h3>
+              <p className="text-sm text-gray-500 text-center mb-6">
+                Are you sure you want to delete <span className="font-semibold">{currentSalon.name}</span>? This action cannot be undone.
+              </p>
               
-              <div className="mt-6 flex justify-center space-x-3">
+              <div className="flex justify-center space-x-3">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="px-4 py-2.5 border border-gray-300 rounded shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-300"
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-300"
                 >
                   Cancel
                 </button>
@@ -663,7 +810,7 @@ const SalonPage: React.FC = () => {
                   type="button"
                   onClick={handleDelete}
                   disabled={isSubmitting}
-                  className="inline-flex items-center px-4 py-2.5 border border-transparent rounded shadow-sm text-sm font-medium text-white bg-red-500 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-500 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? (
                     <>

@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Salon, Service, Staff, Order } from '../types';
 import DashboardCard from '../components/DashboardCard';
 import { Scissors, Users, Calendar, DollarSign, Clock } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 
 const SalonDashboard: React.FC = () => {
   const salonId = localStorage.getItem('salonId');
@@ -30,8 +30,37 @@ const SalonDashboard: React.FC = () => {
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFCC00'];
 
+  // Format currency
+  const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2
+    }).format(amount);
+  };
+
+  // Format date
+  const formatDate = (dateString: string): string => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (err) {
+      return dateString;
+    }
+  };
+
   useEffect(() => {
     const fetchSalonData = async () => {
+      if (!salonId) {
+        setError('No salon ID found. Please select a salon.');
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         
@@ -57,117 +86,221 @@ const SalonDashboard: React.FC = () => {
         const ordersResponse = await fetch(`http://localhost:4000/api/orders/pay/${salonId}`);
         if (!ordersResponse.ok) throw new Error('Failed to fetch orders');
         const ordersData = await ordersResponse.json();
+        
+        // Log the fetched orders for debugging
+        console.log('Fetched orders:', ordersData);
         setOrders(ordersData);
         
         // Calculate stats
-        const totalRevenue = ordersData.reduce((sum: number, order: Order) => {
-          return sum + (order.service?.price || 0);
-        }, 0);
-        
-        const completedOrders = ordersData.filter((order: Order) => order.status === 'completed').length;
-        const pendingOrders = ordersData.filter((order: Order) => order.status === 'booked').length;
-        const cancelledOrders = ordersData.filter((order: Order) => order.status === 'cancelled').length;
-        
-        setStats({
-          totalServices: servicesData.length,
-          totalStaff: staffData.length,
-          totalOrders: ordersData.length,
-          totalRevenue,
-          completedOrders,
-          pendingOrders,
-          cancelledOrders
-        });
-        
-        // Process data for charts
-        prepareChartData(ordersData, servicesData, staffData);
+        calculateStats(ordersData, servicesData, staffData);
         
         setLoading(false);
       } catch (err) {
         console.error('Error loading salon dashboard data:', err);
-        setError('Failed to load salon dashboard data');
+        setError(`Failed to load salon dashboard data: ${err instanceof Error ? err.message : 'Unknown error'}`);
         setLoading(false);
       }
     };
 
-    if (salonId) {
-      fetchSalonData();
-    }
+    fetchSalonData();
   }, [salonId]);
 
-  const prepareChartData = (orders: Order[], services: Service[], staff: Staff[]) => {
-    // 1. Monthly performance data
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const currentDate = new Date();
-    const currentMonth = currentDate.getMonth();
-    
-    // Get the last 6 months
-    const last6Months = Array.from({ length: 6 }, (_, i) => {
-      const monthIndex = (currentMonth - i + 12) % 12;
-      return monthNames[monthIndex];
-    }).reverse();
-    
-    const monthlyStats = last6Months.map(month => {
-      const monthOrders = orders.filter(order => {
-        const orderDate = new Date(order.date);
-        return monthNames[orderDate.getMonth()] === month;
+  const calculateStats = (orders: Order[], services: Service[], staff: Staff[]) => {
+    try {
+      // Calculate total revenue properly
+      let totalRevenue = 0;
+      
+      orders.forEach((order: Order) => {
+        // Try to get the price either from order.price or from the linked service
+        let orderPrice = 0;
+        
+        if (order.price !== undefined && order.price !== null) {
+          // If order has its own price field, use that
+          const parsedPrice = parseFloat(order.price.toString());
+          if (!isNaN(parsedPrice)) {
+            orderPrice = parsedPrice;
+          }
+        } else if (order.serviceId) {
+          // If order references a service, look up that service's price
+          const service = services.find(s => s._id === order.serviceId);
+          if (service && service.price !== undefined) {
+            const parsedPrice = parseFloat(service.price.toString());
+            if (!isNaN(parsedPrice)) {
+              orderPrice = parsedPrice;
+            }
+          }
+        } else if (order.service && order.service.price !== undefined) {
+          // If order has nested service object with price
+          const parsedPrice = parseFloat(order.service.price.toString());
+          if (!isNaN(parsedPrice)) {
+            orderPrice = parsedPrice;
+          }
+        }
+        
+        totalRevenue += orderPrice;
       });
       
-      const monthRevenue = monthOrders.reduce((sum, order) => {
-        return sum + (order.service?.price || 0);
-      }, 0);
+      // Debug the revenue calculation
+      console.log('Calculated total revenue:', totalRevenue);
       
-      return {
-        name: month,
-        orders: monthOrders.length,
-        revenue: monthRevenue
-      };
-    });
-    
-    setMonthlyData(monthlyStats);
-    
-    // 2. Service distribution data
-    const serviceStats: Record<string, number> = {};
-    
-    orders.forEach(order => {
-      const serviceName = services.find(s => s._id === order.serviceId)?.name || 'Unknown';
-      serviceStats[serviceName] = (serviceStats[serviceName] || 0) + 1;
-    });
-    
-    const serviceDistData = Object.keys(serviceStats).map(name => ({
-      name,
-      value: serviceStats[name]
-    }));
-    
-    // If we have too many services, group the smallest ones as "Other"
-    if (serviceDistData.length > 6) {
-      serviceDistData.sort((a, b) => b.value - a.value);
-      const topServices = serviceDistData.slice(0, 5);
-      const otherServices = serviceDistData.slice(5);
+      // Filter orders by status
+      const completedOrders = orders.filter((order: Order) => order.status === 'completed').length;
+      const pendingOrders = orders.filter((order: Order) => order.status === 'booked').length;
+      const cancelledOrders = orders.filter((order: Order) => order.status === 'cancelled').length;
       
-      const otherValue = otherServices.reduce((sum, item) => sum + item.value, 0);
-      topServices.push({ name: 'Other', value: otherValue });
+      setStats({
+        totalServices: services.length,
+        totalStaff: staff.length,
+        totalOrders: orders.length,
+        totalRevenue: parseFloat(totalRevenue.toFixed(2)),
+        completedOrders,
+        pendingOrders,
+        cancelledOrders
+      });
       
-      setServiceDistribution(topServices);
-    } else {
-      setServiceDistribution(serviceDistData);
+      // Process data for charts
+      prepareChartData(orders, services, staff);
+      
+    } catch (err) {
+      console.error('Error calculating stats:', err);
     }
-    
-    // 3. Staff performance data
-    const staffStats: Record<string, number> = {};
-    
-    orders.forEach(order => {
-      const staffMember = staff.find(s => s._id === order.staffId);
-      if (staffMember) {
-        staffStats[staffMember.name] = (staffStats[staffMember.name] || 0) + 1;
+  };
+
+  const prepareChartData = (orders: Order[], services: Service[], staff: Staff[]) => {
+    try {
+      // 1. Monthly performance data
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const currentDate = new Date();
+      const currentMonth = currentDate.getMonth();
+      
+      // Get the last 6 months
+      const last6Months = Array.from({ length: 6 }, (_, i) => {
+        const monthIndex = (currentMonth - i + 12) % 12;
+        return { 
+          index: monthIndex,
+          name: monthNames[monthIndex]
+        };
+      }).reverse();
+      
+      const monthlyStats = last6Months.map(month => {
+        const monthOrders = orders.filter(order => {
+          if (!order.date) return false;
+          
+          try {
+            const orderDate = new Date(order.date);
+            return orderDate.getMonth() === month.index;
+          } catch {
+            return false;
+          }
+        });
+        
+        // Calculate revenue for the month
+        let monthRevenue = 0;
+        
+        monthOrders.forEach(order => {
+          // Try to get price from various possible locations
+          if (order.price !== undefined && order.price !== null) {
+            const price = parseFloat(order.price.toString());
+            if (!isNaN(price)) {
+              monthRevenue += price;
+            }
+          } else if (order.serviceId) {
+            const service = services.find(s => s._id === order.serviceId);
+            if (service && service.price !== undefined) {
+              const price = parseFloat(service.price.toString());
+              if (!isNaN(price)) {
+                monthRevenue += price;
+              }
+            }
+          } else if (order.service && order.service.price !== undefined) {
+            const price = parseFloat(order.service.price.toString());
+            if (!isNaN(price)) {
+              monthRevenue += price;
+            }
+          }
+        });
+        
+        return {
+          name: month.name,
+          orders: monthOrders.length,
+          revenue: parseFloat(monthRevenue.toFixed(2))
+        };
+      });
+      
+      setMonthlyData(monthlyStats);
+      
+      // 2. Service distribution data
+      const serviceStats: Record<string, number> = {};
+      
+      orders.forEach(order => {
+        let serviceName = 'Unknown';
+        
+        // Try to find service name either by reference or direct embedding
+        if (order.serviceId) {
+          const service = services.find(s => s._id === order.serviceId);
+          if (service && service.name) {
+            serviceName = service.name;
+          }
+        } else if (order.service && order.service.name) {
+          serviceName = order.service.name;
+        }
+        
+        serviceStats[serviceName] = (serviceStats[serviceName] || 0) + 1;
+      });
+      
+      const serviceDistData = Object.keys(serviceStats).map(name => ({
+        name,
+        value: serviceStats[name]
+      }));
+      
+      // If we have too many services, group the smallest ones as "Other"
+      if (serviceDistData.length > 6) {
+        serviceDistData.sort((a, b) => b.value - a.value);
+        const topServices = serviceDistData.slice(0, 5);
+        const otherServices = serviceDistData.slice(5);
+        
+        const otherValue = otherServices.reduce((sum, item) => sum + item.value, 0);
+        topServices.push({ name: 'Other', value: otherValue });
+        
+        setServiceDistribution(topServices);
+      } else {
+        setServiceDistribution(serviceDistData);
       }
-    });
-    
-    const staffPerformanceData = Object.keys(staffStats).map(name => ({
-      name,
-      orders: staffStats[name]
-    }));
-    
-    setStaffPerformance(staffPerformanceData);
+      
+      // 3. Staff performance data
+      const staffStats: Record<string, number> = {};
+      
+      orders.forEach(order => {
+        let staffName = 'Unassigned';
+        
+        // Try to find staff either by ID reference or direct embedding
+        if (order.staffId) {
+          const staffMember = staff.find(s => s._id === order.staffId);
+          if (staffMember && staffMember.name) {
+            staffName = staffMember.name;
+          }
+        } else if (order.staff && order.staff.name) {
+          staffName = order.staff.name;
+        }
+        
+        // Only count completed orders for staff performance
+        if (order.status === 'completed') {
+          staffStats[staffName] = (staffStats[staffName] || 0) + 1;
+        }
+      });
+      
+      const staffPerformanceData = Object.keys(staffStats)
+        .filter(name => name !== 'Unassigned' || staffStats[name] > 0) // Only include unassigned if it has orders
+        .map(name => ({
+          name,
+          orders: staffStats[name]
+        }))
+        .sort((a, b) => b.orders - a.orders); // Sort by number of orders
+      
+      setStaffPerformance(staffPerformanceData);
+    } catch (err) {
+      console.error('Error preparing chart data:', err);
+    }
   };
 
   if (loading) return (
@@ -300,10 +433,13 @@ const SalonDashboard: React.FC = () => {
               <XAxis dataKey="name" />
               <YAxis yAxisId="left" />
               <YAxis yAxisId="right" orientation="right" />
-              <Tooltip />
+              <Tooltip formatter={(value, name) => [
+                name === 'revenue' ? formatCurrency(Number(value)) : value,
+                name === 'revenue' ? 'Revenue' : 'Orders'
+              ]}/>
               <Legend />
               <Line yAxisId="left" type="monotone" dataKey="orders" stroke="#8884d8" activeDot={{ r: 8 }} name="Orders" />
-              <Line yAxisId="right" type="monotone" dataKey="revenue" stroke="#82ca9d" name="Revenue ($)" />
+              <Line yAxisId="right" type="monotone" dataKey="revenue" stroke="#82ca9d" name="Revenue" />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -311,41 +447,53 @@ const SalonDashboard: React.FC = () => {
         {/* Service Distribution Pie Chart */}
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold mb-4">Service Distribution</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={serviceDistribution}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                outerRadius={100}
-                fill="#8884d8"
-                dataKey="value"
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-              >
-                {serviceDistribution.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
+          {serviceDistribution.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={serviceDistribution}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  outerRadius={100}
+                  fill="#8884d8"
+                  dataKey="value"
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                >
+                  {serviceDistribution.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value) => [`${value} orders`, 'Count']} />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-64">
+              <p className="text-gray-500">No service data available</p>
+            </div>
+          )}
         </div>
       </div>
       
       {/* Staff Performance */}
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold mb-4">Staff Performance</h3>
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={staffPerformance}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            <Line type="monotone" dataKey="orders" stroke="#8884d8" name="Orders Completed" />
-          </LineChart>
-        </ResponsiveContainer>
+        {staffPerformance.length > 0 ? (
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={staffPerformance}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="orders" fill="#8884d8" name="Completed Orders" />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="flex items-center justify-center h-64">
+            <p className="text-gray-500">No staff performance data available</p>
+          </div>
+        )}
       </div>
       
       {/* Recent Orders */}
@@ -372,53 +520,77 @@ const SalonDashboard: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {orders.slice(0, 5).map((order) => {
-                const orderService = services.find(s => s._id === order.serviceId);
-                const orderStaff = staff.find(s => s._id === order.staffId);
-                
-                return (
-                  <tr key={order._id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{order.customerName}</div>
-                      <div className="text-sm text-gray-500">{order.customerPhone}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{orderService?.name || 'Unknown Service'}</div>
-                      <div className="text-sm text-gray-500">${orderService?.price || 0}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{orderStaff?.name || 'Unassigned'}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{order.date}</div>
-                      <div className="text-sm text-gray-500">{order.time}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                        ${order.status === 'completed' ? 'bg-green-100 text-green-800' : 
-                          order.status === 'cancelled' ? 'bg-red-100 text-red-800' : 
-                          'bg-yellow-100 text-yellow-800'}`}>
-                        {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <Link 
-                        to={`/orders/${salonId}/${order._id}`}
-                        className="text-indigo-600 hover:text-indigo-900 mr-3"
-                      >
-                        View
-                      </Link>
-                      <Link 
-                        to={`/orders/${salonId}/${order._id}/edit`}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        Edit
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-              {orders.length === 0 && (
+              {orders.length > 0 ? 
+                orders.slice(0, 5).map((order) => {
+                  // Find service info
+                  let serviceName = 'Unknown Service';
+                  let servicePrice = 0;
+                  
+                  if (order.serviceId) {
+                    const orderService = services.find(s => s._id === order.serviceId);
+                    if (orderService) {
+                      serviceName = orderService.name || 'Unknown Service';
+                      servicePrice = parseFloat(orderService.price?.toString() || '0');
+                    }
+                  } else if (order.service) {
+                    serviceName = order.service.name || 'Unknown Service';
+                    servicePrice = parseFloat(order.service.price?.toString() || '0');
+                  }
+                  
+                  // Find staff info
+                  let staffName = 'Unassigned';
+                  
+                  if (order.staffId) {
+                    const orderStaff = staff.find(s => s._id === order.staffId);
+                    if (orderStaff) {
+                      staffName = orderStaff.name || 'Unassigned';
+                    }
+                  } else if (order.staff) {
+                    staffName = order.staff.name || 'Unassigned';
+                  }
+                  
+                  return (
+                    <tr key={order._id}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{order.customerName || 'N/A'}</div>
+                        <div className="text-sm text-gray-500">{order.customerPhone || 'N/A'}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{serviceName}</div>
+                        <div className="text-sm text-gray-500">{formatCurrency(servicePrice)}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{staffName}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{order.date ? formatDate(order.date) : 'N/A'}</div>
+                        <div className="text-sm text-gray-500">{order.time || 'N/A'}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                          ${order.status === 'completed' ? 'bg-green-100 text-green-800' : 
+                            order.status === 'cancelled' ? 'bg-red-100 text-red-800' : 
+                            'bg-yellow-100 text-yellow-800'}`}>
+                          {order.status ? (order.status.charAt(0).toUpperCase() + order.status.slice(1)) : 'Unknown'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <Link 
+                          to={`/orders/${salonId}/${order._id}`}
+                          className="text-indigo-600 hover:text-indigo-900 mr-3"
+                        >
+                          View
+                        </Link>
+                        <Link 
+                          to={`/orders/${salonId}/${order._id}/edit`}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          Edit
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                }) : (
                 <tr>
                   <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
                     No orders found

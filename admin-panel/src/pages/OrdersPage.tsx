@@ -40,7 +40,7 @@ const OrdersPage: React.FC = () => {
       setLoading(true);
       
       const [ordersResponse, servicesResponse, staffResponse] = await Promise.all([
-        fetch(`http://localhost:4000/api/orders/${salonId}`),
+        fetch(`http://localhost:4000/api/orders/pay/${salonId}`),
         fetch(`http://localhost:4000/api/services/${salonId}`),
         fetch(`http://localhost:4000/api/staffs/${salonId}`)
       ]);
@@ -124,7 +124,8 @@ const OrdersPage: React.FC = () => {
         customerPhone,
         date,
         time,
-        status: 'booked'
+        status: 'booked',
+        price: undefined
       };
       
       const response = await fetch(`http://localhost:4000/api/orders/${salonId}`, {

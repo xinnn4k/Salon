@@ -1,31 +1,81 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout/Layout';
-import { useBookings } from '../contexts/BookingContext';
 import { useAuth } from '../contexts/AuthContext';
+import axios from 'axios';
 import { 
   Clock, Calendar, ChevronRight, AlertCircle, CreditCard, 
   CheckCircle, XCircle, ChevronsRight, Search, FilterIcon,
-  Loader, ExternalLink, AlertTriangle
+  Loader, AlertTriangle, DollarSign, Package
 } from 'lucide-react';
 
-type BookingStatus = 'all' | 'pending' | 'confirmed' | 'completed' | 'cancelled';
+// Define type for orders
+type Order = {
+  _id: string;
+  userId: string;
+  salonId: {
+    _id: string;
+    name: string;
+  };
+  serviceId: {
+    _id: string;
+    name: string;
+    price: number;
+  };
+  staffId: {
+    _id: string;
+    name: string;
+  };
+  date: string;
+  time: string;
+  status: OrderStatus;
+  price: number;
+  paymentMethod?: string;
+  paymentDate?: string;
+  cardLastFour?: string;
+  notes?: string;
+  createdAt: string;
+};
+
+type OrderStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
+type OrderFilter = 'all' | OrderStatus;
 
 const OrdersPage: React.FC = () => {
   const navigate = useNavigate();
-  const { bookings, cancelBooking, isLoading, error } = useBookings();
-  const { user, isAuthenticated } = useAuth(); // Get the current user
+  const { user, isAuthenticated } = useAuth();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filter, setFilter] = useState<BookingStatus>('all');
+  const [filter, setFilter] = useState<OrderFilter>('all');
   const [showFilters, setShowFilters] = useState(false);
 
-  React.useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login', { state: { returnUrl: '/bookings' } });
-    }
-  }, [isAuthenticated, navigate]);
+  // Fetch orders when component mounts
+  useEffect(() => {
+    const fetchOrders = async () => {
+      if (!isAuthenticated || !user?.id) {
+        navigate('/login', { state: { returnUrl: '/orders' } });
+        return;
+      }
 
-  const getStatusColor = useCallback((status: string) => {
+      try {
+        setIsLoading(true);
+        // Replace with your actual API endpoint
+        const response = await axios.get(`http://localhost:4000/api/orders/user/${user.id}`);
+        setOrders(response.data);
+        setError(null);
+      } catch (err) {
+        setError('Захиалгын мэдээлэл авахад алдаа гарлаа.');
+        console.error('Error fetching orders:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, [user, isAuthenticated, navigate]);
+
+  const getStatusColor = useCallback((status: OrderStatus) => {
     switch (status) {
       case 'confirmed':
         return 'bg-green-100 text-green-800';
@@ -40,7 +90,7 @@ const OrdersPage: React.FC = () => {
     }
   }, []);
 
-  const getStatusIcon = useCallback((status: string) => {
+  const getStatusIcon = useCallback((status: OrderStatus) => {
     switch (status) {
       case 'confirmed':
         return <CheckCircle size={16} className="text-green-600" />;
@@ -55,7 +105,7 @@ const OrdersPage: React.FC = () => {
     }
   }, []);
 
-  const getStatusText = useCallback((status: string) => {
+  const getStatusText = useCallback((status: OrderStatus) => {
     switch (status) {
       case 'confirmed':
         return 'Баталгаажсан';
@@ -70,56 +120,67 @@ const OrdersPage: React.FC = () => {
     }
   }, []);
 
-  const filteredBookings = useMemo(() => {
+  const filteredOrders = useMemo(() => {
     if (!user || !user.id) return [];
     
-    return bookings
+    return orders.filter(order => {
+      const matchesFilter = filter === 'all' || order.status === filter;
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = 
+        (order.salonId?.name?.toLowerCase() || '').includes(searchLower) || 
+        (order.serviceId?.name?.toLowerCase() || '').includes(searchLower) ||
+        (order.staffId?.name?.toLowerCase() || '').includes(searchLower) ||
+        order._id.toLowerCase().includes(searchLower);
+                          
+      return matchesFilter && matchesSearch;
+    });
+  }, [orders, filter, searchTerm, user]);
 
-    .filter(booking => booking.userId === user.id)
+  const sortedOrders = useMemo(() => {
+    return [...filteredOrders].sort((a, b) => {
 
-    .filter(booking => {
-        const matchesFilter = filter === 'all' || booking.status === filter;
-        const searchLower = searchTerm.toLowerCase();
-        const matchesSearch = 
-          booking.salonName.toLowerCase().includes(searchLower) || 
-          booking.serviceName.toLowerCase().includes(searchLower) ||
-          booking.staffName.toLowerCase().includes(searchLower) ||
-          booking.bookingId.toLowerCase().includes(searchLower);
-                            
-        return matchesFilter && matchesSearch;
-      });
-  }, [bookings, filter, searchTerm, user]);
-
-  const sortedBookings = useMemo(() => {
-    return [...filteredBookings].sort((a, b) => {
-      const dateA = new Date(a.bookingDate);
-      const dateB = new Date(b.bookingDate);
+      const dateA = new Date(a.createdAt);
+      const dateB = new Date(b.createdAt);
       
       if (!isNaN(dateA.getTime()) && !isNaN(dateB.getTime())) {
         return dateB.getTime() - dateA.getTime();
       }
       
-      return a.bookingId > b.bookingId ? -1 : 1;
+      return a._id > b._id ? -1 : 1;
     });
-  }, [filteredBookings]);
+  }, [filteredOrders]);
 
-  const handleCancelBooking = useCallback((bookingId: string, event: React.MouseEvent) => {
+  const handleCancelOrder = useCallback(async (orderId: string, event: React.MouseEvent) => {
     event.stopPropagation();
     
     if (window.confirm('Та энэ захиалгыг цуцлахдаа итгэлтэй байна уу?')) {
-      cancelBooking(bookingId);
+      try {
+        // Replace with your actual API endpoint
+        await axios.put(`http://localhost:4000/api/orders/${user?.id}/${orderId}`, { status: 'cancelled' });
+        
+        // Update local state
+        setOrders(prevOrders => 
+          prevOrders.map(order => 
+            order._id === orderId 
+              ? { ...order, status: 'cancelled' as OrderStatus } 
+              : order
+          )
+        );
+      } catch (err) {
+        setError('Захиалгыг цуцлахад алдаа гарлаа.');
+        console.error('Error cancelling order:', err);
+      }
     }
-  }, [cancelBooking]);
+  }, [user]);
 
-  const handleBookingClick = useCallback((bookingId: string) => {
-    navigate(`/booking/${bookingId}`);
+  const handleOrderClick = useCallback((orderId: string) => {
+    navigate(`/order/${orderId}`);
   }, [navigate]);
 
-  const handlePayment = useCallback((bookingId: string, event: React.MouseEvent) => {
+  const handlePayment = useCallback((orderId: string, event: React.MouseEvent) => {
     event.stopPropagation();
-    navigate(`/payment/${bookingId}`);
+    navigate(`/payment/${orderId}`);
   }, [navigate]);
-
 
   const formatDate = useCallback((dateString: string) => {
     try {
@@ -135,7 +196,6 @@ const OrdersPage: React.FC = () => {
       return dateString;
     }
   }, []);
-
 
   const resetFilters = useCallback(() => {
     setSearchTerm('');
@@ -162,7 +222,7 @@ const OrdersPage: React.FC = () => {
     );
   }
 
-  const userBookingsCount = user && user.id ? bookings.filter(b => b.userId === user.id).length : 0;
+  const userOrdersCount = orders.length;
 
   return (
     <Layout>
@@ -173,11 +233,11 @@ const OrdersPage: React.FC = () => {
             <p className="text-white/80 mt-2">Бүх захиалга болон төлбөрийн мэдээлэл</p>
             <div className="mt-3 flex items-center">
               <span className="bg-white/20 text-white text-sm px-3 py-1 rounded-full">
-                Нийт: {userBookingsCount} захиалга
+                Нийт: {userOrdersCount} захиалга
               </span>
-              {filteredBookings.length !== userBookingsCount && (
+              {filteredOrders.length !== userOrdersCount && (
                 <span className="bg-white/20 text-white text-sm px-3 py-1 rounded-full ml-2">
-                  Шүүсэн: {filteredBookings.length}
+                  Шүүсэн: {filteredOrders.length}
                 </span>
               )}
             </div>
@@ -266,10 +326,10 @@ const OrdersPage: React.FC = () => {
               <p className="text-gray-600">Захиалгууд ачааллаж байна...</p>
             </div>
           </div>
-        ) : sortedBookings.length === 0 ? (
+        ) : sortedOrders.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm p-8 text-center">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Calendar size={24} className="text-gray-400" />
+              <Package size={24} className="text-gray-400" />
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">Захиалга олдсонгүй</h3>
             <p className="text-gray-500 mb-6">
@@ -299,21 +359,21 @@ const OrdersPage: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {sortedBookings.map((booking) => (
+            {sortedOrders.map((order) => (
               <div 
-                key={booking.bookingId} 
+                key={order._id} 
                 className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => handleBookingClick(booking.bookingId)}
+                onClick={() => handleOrderClick(order._id)}
               >
                 <div className="p-5 border-b border-gray-100">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="text-lg font-medium text-gray-900">{booking.serviceName}</h3>
-                      <p className="text-gray-600">{booking.salonName}</p>
+                      <h3 className="text-lg font-medium text-gray-900">{order.serviceId?.name}</h3>
+                      <p className="text-gray-600">{order.salonId?.name}</p>
                     </div>
-                    <div className={`px-3 py-1 rounded-full text-xs font-medium flex items-center ${getStatusColor(booking.status)}`}>
-                      {getStatusIcon(booking.status)}
-                      <span className="ml-1">{getStatusText(booking.status)}</span>
+                    <div className={`px-3 py-1 rounded-full text-xs font-medium flex items-center ${getStatusColor(order.status)}`}>
+                      {getStatusIcon(order.status)}
+                      <span className="ml-1">{getStatusText(order.status)}</span>
                     </div>
                   </div>
                 </div>
@@ -321,37 +381,37 @@ const OrdersPage: React.FC = () => {
                 <div className="px-5 py-3 grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <p className="text-xs text-gray-500">Мэргэжилтэн</p>
-                    <p className="font-medium">{booking.staffName}</p>
+                    <p className="font-medium">{order.staffId?.name}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Огноо</p>
-                    <p className="font-medium">{formatDate(booking.date)}</p>
+                    <p className="font-medium">{formatDate(order.date)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Цаг</p>
-                    <p className="font-medium">{booking.time}</p>
+                    <p className="font-medium">{order.time}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Үнэ</p>
-                    <p className="font-medium text-purple-600">{booking.price.toLocaleString()}₮</p>
+                    <p className="font-medium text-purple-600">{order.price.toLocaleString()}₮</p>
                   </div>
                 </div>
                 
-                {booking.paymentMethod && (
+                {order.paymentMethod && (
                   <div className="px-5 py-3 bg-gray-50 border-t border-gray-100">
                     <div className="flex items-center">
                       <CreditCard size={16} className="text-gray-500 mr-2" />
                       <div className="text-sm text-gray-600">
-                        {booking.paymentMethod === 'card' ? (
+                        {order.paymentMethod === 'card' ? (
                           <>
-                            Картаар төлсөн {booking.cardLastFour ? `(•••• ${booking.cardLastFour})` : ''}
+                            Картаар төлсөн {order.cardLastFour ? `(•••• ${order.cardLastFour})` : ''}
                           </>
                         ) : (
                           <>QPay-ээр төлсөн</>
                         )}
-                        {booking.paymentDate && (
+                        {order.paymentDate && (
                           <span className="ml-1 text-gray-500">
-                            {new Date(booking.paymentDate).toLocaleDateString('en-US', {
+                            {new Date(order.paymentDate).toLocaleDateString('en-US', {
                               year: 'numeric',
                               month: 'short',
                               day: 'numeric',
@@ -364,26 +424,26 @@ const OrdersPage: React.FC = () => {
                 )}
                 
                 <div className="px-5 py-3 border-t border-gray-100 flex justify-between items-center">
-                  {booking.status === 'pending' ? (
+                  {order.status === 'pending' ? (
                     <div className="flex space-x-3">
                       <button
-                        onClick={(e) => handlePayment(booking.bookingId, e)}
+                        onClick={(e) => handlePayment(order._id, e)}
                         className="py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg flex items-center"
                       >
+                        <DollarSign size={16} className="mr-1" />
                         Төлбөр төлөх
-                        <ChevronsRight size={16} className="ml-1" />
                       </button>
                       <button
-                        onClick={(e) => handleCancelBooking(booking.bookingId, e)}
+                        onClick={(e) => handleCancelOrder(order._id, e)}
                         className="py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg"
                       >
                         Цуцлах
                       </button>
                     </div>
-                  ) : booking.status === 'confirmed' ? (
+                  ) : order.status === 'confirmed' ? (
                     <div className="flex space-x-3">
                       <button
-                        onClick={(e) => handleCancelBooking(booking.bookingId, e)}
+                        onClick={(e) => handleCancelOrder(order._id, e)}
                         className="py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg"
                       >
                         Цуцлах
@@ -391,15 +451,15 @@ const OrdersPage: React.FC = () => {
                     </div>
                   ) : (
                     <div className="text-sm text-gray-500">
-                      {booking.status === 'completed' && 'Үйлчилгээ дууссан'}
-                      {booking.status === 'cancelled' && 'Захиалга цуцлагдсан'}
+                      {order.status === 'completed' && 'Үйлчилгээ дууссан'}
+                      {order.status === 'cancelled' && 'Захиалга цуцлагдсан'}
                     </div>
                   )}
                   
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigate(`/booking/${booking.bookingId}`);
+                      navigate(`/booking/${order._id}`);
                     }}
                     className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center"
                   >

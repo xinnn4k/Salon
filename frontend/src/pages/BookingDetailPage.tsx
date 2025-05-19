@@ -1,64 +1,96 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout/Layout';
-import { useBookings, BookingDetails } from '../contexts/BookingContext';
 import { useAuth } from '../contexts/AuthContext';
+import axios from 'axios';
 import { 
   ArrowLeft, Calendar, Clock, MapPin, User, CreditCard, 
   CheckCircle, XCircle, AlertCircle, Share2, ChevronRight, 
-  Loader, AlertTriangle, Trash, Edit
+  Loader, AlertTriangle, Trash, Edit, Package
 } from 'lucide-react';
 
-const BookingDetailsPage: React.FC = () => {
-  const { bookingId } = useParams<{ bookingId: string }>();
+interface OrderDetails {
+  _id: string;
+  salonId: {
+    _id: string;
+    name: string;
+    address: string;
+    phone: string;
+  };
+  serviceId: {
+    _id: string;
+    name: string;
+    description: string;
+    price: number;
+    duration: number;
+  };
+  staffId: {
+    _id: string;
+    name: string;
+    position: string;
+  };
+  userId: string;
+  date: string;
+  time: string;
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  paymentMethod?: 'card' | 'qpay';
+  paymentDate?: string;
+  cardLastFour?: string;
+  bookingDate: string;
+  price: number;
+}
+
+const OrderDetailsPage: React.FC = () => {
+  const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
-  const { getBookingById, cancelBooking, error, isLoading } = useBookings();
-  const { isAuthenticated } = useAuth();
-  const [booking, setBooking] = useState<BookingDetails | null>(null);
+  const { isAuthenticated, user } = useAuth();
+  const [order, setOrder] = useState<OrderDetails | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [isCancelling, setIsCancelling] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
-      navigate('/login', { state: { returnUrl: `/booking/${bookingId}` } });
+      navigate('/login', { state: { returnUrl: `/booking/${orderId}` } });
+      return;
     }
-  }, [isAuthenticated, navigate, bookingId]);
-
-  useEffect(() => {
-    if (!bookingId) return;
     
-    const fetchBooking = () => {
-      const foundBooking = getBookingById(bookingId);
-      if (foundBooking) {
-        setBooking(foundBooking);
-      } else {
-        navigate('/bookings', { state: { error: 'Захиалга олдсонгүй' } });
+    if (!orderId) return;
+    
+    const fetchOrder = async () => {
+      try {
+        setIsLoading(true);
+        const response = await axios.get(`http://localhost:4000/api/orders/${orderId}`);
+        setOrder(response.data);
+      } catch (err: any) {
+        setError(err.response?.data?.error || 'Захиалгын мэдээлэл авахад алдаа гарлаа');
+      } finally {
+        setIsLoading(false);
       }
     };
     
-    fetchBooking();
-  }, [bookingId, getBookingById, navigate]);
+    fetchOrder();
+  }, [orderId, isAuthenticated, navigate]);
 
-  const handleCancelBooking = () => {
-    if (!booking) return;
+  const handleCancelOrder = async () => {
+    if (!order) return;
     
     setIsCancelling(true);
     
-    setTimeout(() => {
-      try {
-        cancelBooking(booking.bookingId);
-        setShowCancelModal(false);
-        setBooking({
-          ...booking,
-          status: 'cancelled'
-        });
-      } catch (error) {
-        console.error('Error cancelling booking:', error);
-      } finally {
-        setIsCancelling(false);
-      }
-    }, 800);
+    try {
+      await axios.delete(`http://localhost:4000/api/orders/${order.salonId._id}/${order._id}`);
+      setShowCancelModal(false);
+      setOrder({
+        ...order,
+        status: 'cancelled'
+      });
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Захиалга цуцлахад алдаа гарлаа');
+    } finally {
+      setIsCancelling(false);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -122,15 +154,14 @@ const BookingDetailsPage: React.FC = () => {
     }
   };
 
-  const shareBooking = () => {
+  const shareOrder = () => {
     if (navigator.share) {
       navigator.share({
-        title: `${booking?.serviceName} захиалга`,
-        text: `${booking?.salonName}-д ${booking?.date} өдрийн ${booking?.time}-д ${booking?.serviceName} үйлчилгээ захиалсан.`,
+        title: `${order?.serviceId.name} захиалга`,
+        text: `${order?.salonId.name}-д ${formatDate(order?.date || '')} өдрийн ${order?.time}-д ${order?.serviceId.name} үйлчилгээ захиалсан.`,
         url: window.location.href
       }).catch(err => console.error('Error sharing:', err));
     } else {
-
       navigator.clipboard.writeText(window.location.href)
         .then(() => alert('Хуваалцах холбоос хуулагдлаа!'))
         .catch(err => console.error('Error copying to clipboard:', err));
@@ -146,7 +177,7 @@ const BookingDetailsPage: React.FC = () => {
             <h3 className="text-lg font-medium text-red-800 mb-2">Алдаа гарлаа</h3>
             <p className="text-red-600 mb-4">{error}</p>
             <button 
-              onClick={() => navigate('/bookings')}
+              onClick={() => navigate('/orders')}
               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
             >
               Буцах
@@ -157,7 +188,7 @@ const BookingDetailsPage: React.FC = () => {
     );
   }
 
-  if (isLoading || !booking) {
+  if (isLoading || !order) {
     return (
       <Layout>
         <div className="max-w-screen-xl mx-auto px-4 py-8">
@@ -185,31 +216,31 @@ const BookingDetailsPage: React.FC = () => {
         {/* Status Card */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
           <div className={`p-6 flex items-center justify-between ${
-            booking.status === 'cancelled' ? 'bg-red-50' : 
-            booking.status === 'confirmed' ? 'bg-green-50' : 
-            booking.status === 'completed' ? 'bg-blue-50' : 'bg-yellow-50'
+            order.status === 'cancelled' ? 'bg-red-50' : 
+            order.status === 'confirmed' ? 'bg-green-50' : 
+            order.status === 'completed' ? 'bg-blue-50' : 'bg-yellow-50'
           }`}>
             <div className="flex items-center">
-              {getStatusIcon(booking.status)}
+              {getStatusIcon(order.status)}
               <div className="ml-3">
                 <p className="text-sm text-gray-500">Захиалгын төлөв</p>
                 <h3 className="text-xl font-medium">
-                  {getStatusText(booking.status)}
+                  {getStatusText(order.status)}
                 </h3>
               </div>
             </div>
-            <div className={`px-4 py-2 rounded-lg ${getStatusColor(booking.status)}`}>
-              #{booking.bookingId.slice(-6).toUpperCase()}
+            <div className={`px-4 py-2 rounded-lg ${getStatusColor(order.status)}`}>
+              #{order._id.slice(-6).toUpperCase()}
             </div>
           </div>
           
-          {booking.status === 'pending' && (
+          {order.status === 'pending' && (
             <div className="bg-yellow-50 p-4 border-t border-yellow-100 flex justify-between items-center">
               <p className="text-sm text-yellow-700">
                 Захиалгаа баталгаажуулахын тулд төлбөрөө төлнө үү.
               </p>
               <button
-                onClick={() => navigate(`/payment/${booking.bookingId}`)}
+                onClick={() => navigate(`/payment/${order._id}`)}
                 className="py-2 px-4 bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium rounded-lg"
               >
                 Төлбөр төлөх
@@ -221,8 +252,8 @@ const BookingDetailsPage: React.FC = () => {
         {/* Service Details */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
           <div className="p-6">
-            <h2 className="text-xl font-bold mb-1">{booking.serviceName}</h2>
-            <p className="text-gray-600 mb-4">{booking.salonName}</p>
+            <h2 className="text-xl font-bold mb-1">{order.serviceId.name}</h2>
+            <p className="text-gray-600 mb-4">{order.salonId.name}</p>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
@@ -230,7 +261,7 @@ const BookingDetailsPage: React.FC = () => {
                   <Calendar size={20} className="text-gray-400 mr-3 mt-1" />
                   <div>
                     <p className="text-sm text-gray-500">Огноо</p>
-                    <p className="font-medium">{formatDate(booking.date)}</p>
+                    <p className="font-medium">{formatDate(order.date)}</p>
                   </div>
                 </div>
                 
@@ -238,7 +269,7 @@ const BookingDetailsPage: React.FC = () => {
                   <Clock size={20} className="text-gray-400 mr-3 mt-1" />
                   <div>
                     <p className="text-sm text-gray-500">Цаг</p>
-                    <p className="font-medium">{booking.time}</p>
+                    <p className="font-medium">{order.time}</p>
                   </div>
                 </div>
                 
@@ -246,7 +277,8 @@ const BookingDetailsPage: React.FC = () => {
                   <User size={20} className="text-gray-400 mr-3 mt-1" />
                   <div>
                     <p className="text-sm text-gray-500">Мэргэжилтэн</p>
-                    <p className="font-medium">{booking.staffName}</p>
+                    <p className="font-medium">{order.staffId.name}</p>
+                    <p className="text-gray-500 text-sm">{order.staffId.position}</p>
                   </div>
                 </div>
               </div>
@@ -256,8 +288,12 @@ const BookingDetailsPage: React.FC = () => {
                   <MapPin size={20} className="text-gray-400 mr-3 mt-1" />
                   <div>
                     <p className="text-sm text-gray-500">Салон</p>
-                    <p className="font-medium">{booking.salonName}</p>
-                    <button className="text-blue-600 text-sm flex items-center mt-1">
+                    <p className="font-medium">{order.salonId.name}</p>
+                    <p className="text-gray-500 text-sm">{order.salonId.address}</p>
+                    <button 
+                      onClick={() => navigate(`/salon/${order.salonId._id}`)}
+                      className="text-blue-600 text-sm flex items-center mt-1"
+                    >
                       Харах
                       <ChevronRight size={14} className="ml-1" />
                     </button>
@@ -265,16 +301,12 @@ const BookingDetailsPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-start">
-                  <Calendar size={20} className="text-gray-400 mr-3 mt-1" />
+                  <Package size={20} className="text-gray-400 mr-3 mt-1" />
                   <div>
-                    <p className="text-sm text-gray-500">Захиалга хийсэн огноо</p>
-                    <p className="font-medium">
-                      {new Date(booking.bookingDate).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })}
-                    </p>
+                    <p className="text-sm text-gray-500">Үйлчилгээ</p>
+                    <p className="font-medium">{order.serviceId.name}</p>
+                    <p className="text-gray-500 text-sm">{order.serviceId.description}</p>
+                    <p className="text-gray-500 text-sm">Үргэлжлэх: {order.serviceId.duration} минут</p>
                   </div>
                 </div>
               </div>
@@ -289,23 +321,15 @@ const BookingDetailsPage: React.FC = () => {
             
             <div className="flex justify-between items-center py-3 border-b border-gray-100">
               <span className="text-gray-600">Үйлчилгээний үнэ</span>
-              <span className="font-medium">{booking.price.toLocaleString()}₮</span>
+              <span className="font-medium">{order.price.toLocaleString()}₮</span>
             </div>
-            
-            {/* Only show if there was a discount */}
-            {false && (
-              <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                <span className="text-gray-600">Хөнгөлөлт</span>
-                <span className="text-green-600 font-medium">-5,000₮</span>
-              </div>
-            )}
             
             <div className="flex justify-between items-center py-3 mt-2">
               <span className="text-gray-900 font-medium">Нийт төлбөр</span>
-              <span className="text-xl font-bold text-purple-600">{booking.price.toLocaleString()}₮</span>
+              <span className="text-xl font-bold text-purple-600">{order.price.toLocaleString()}₮</span>
             </div>
 
-            {booking.paymentMethod && (
+            {order.paymentMethod && (
               <div className="mt-6 pt-6 border-t border-gray-100">
                 <div className="flex items-center mb-2">
                   <CreditCard size={18} className="text-gray-500 mr-2" />
@@ -317,16 +341,16 @@ const BookingDetailsPage: React.FC = () => {
                     <div>
                       <p className="text-gray-500 text-sm">Төлбөрийн хэлбэр</p>
                       <p className="font-medium">
-                        {booking.paymentMethod === 'card' 
-                          ? `Карт (•••• ${booking.cardLastFour || '****'})` 
+                        {order.paymentMethod === 'card' 
+                          ? `Карт (•••• ${order.cardLastFour || '****'})` 
                           : 'QPay'}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="text-gray-500 text-sm">Төлсөн огноо</p>
                       <p className="font-medium">
-                        {booking.paymentDate 
-                          ? new Date(booking.paymentDate).toLocaleDateString() 
+                        {order.paymentDate 
+                          ? new Date(order.paymentDate).toLocaleDateString() 
                           : 'N/A'}
                       </p>
                     </div>
@@ -335,10 +359,10 @@ const BookingDetailsPage: React.FC = () => {
               </div>
             )}
             
-            {booking.status === 'pending' && (
+            {order.status === 'pending' && (
               <div className="mt-6">
                 <button
-                  onClick={() => navigate(`/payment/${booking.bookingId}`)}
+                  onClick={() => navigate(`/payment/${order._id}`)}
                   className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg"
                 >
                   Төлбөр төлөх
@@ -350,7 +374,7 @@ const BookingDetailsPage: React.FC = () => {
 
         {/* Actions */}
         <div className="space-y-4">
-          {(booking.status === 'pending' || booking.status === 'confirmed') && (
+          {(order.status === 'pending' || order.status === 'confirmed') && (
             <button
               onClick={() => setShowCancelModal(true)}
               className="w-full p-4 bg-white rounded-xl shadow-sm flex items-center justify-between hover:bg-red-50 transition-colors border border-transparent hover:border-red-100"
@@ -363,9 +387,9 @@ const BookingDetailsPage: React.FC = () => {
             </button>
           )}
 
-          {booking.status === 'confirmed' && (
+          {order.status === 'confirmed' && (
             <button
-              onClick={() => navigate(`/reschedule/${booking.bookingId}`)}
+              onClick={() => navigate(`/reschedule/${order._id}`)}
               className="w-full p-4 bg-white rounded-xl shadow-sm flex items-center justify-between hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100"
             >
               <div className="flex items-center">
@@ -377,7 +401,7 @@ const BookingDetailsPage: React.FC = () => {
           )}
           
           <button
-            onClick={shareBooking}
+            onClick={shareOrder}
             className="w-full p-4 bg-white rounded-xl shadow-sm flex items-center justify-between hover:bg-gray-50 transition-colors"
           >
             <div className="flex items-center">
@@ -418,7 +442,7 @@ const BookingDetailsPage: React.FC = () => {
                 Болих
               </button>
               <button
-                onClick={handleCancelBooking}
+                onClick={handleCancelOrder}
                 className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg flex items-center justify-center"
                 disabled={isCancelling}
               >
@@ -439,4 +463,4 @@ const BookingDetailsPage: React.FC = () => {
   );
 };
 
-export default BookingDetailsPage;
+export default OrderDetailsPage;

@@ -1,9 +1,12 @@
-// models/Salon.js
 const mongoose = require('mongoose');
 
 const salonSchema = new mongoose.Schema({
   name: String,
-  location: String,
+  location: String, // Human-readable address
+  coordinates: {
+    longitude: Number,
+    latitude: Number
+  },
   phone: String,
   email: { type: String, unique: true },
   password: { type: String },

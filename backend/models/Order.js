@@ -5,8 +5,7 @@ const orderSchema = new mongoose.Schema({
     salonId: { type: mongoose.Schema.Types.ObjectId, ref: 'Salon' },
     serviceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Service' },
     staffId: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff' },
-    customerName: String,
-    customerPhone: String,
+    userId:{ type: mongoose.Schema.Types.ObjectId, ref: 'User'},
     date: String, // or Date
     time: String,
     status: { 

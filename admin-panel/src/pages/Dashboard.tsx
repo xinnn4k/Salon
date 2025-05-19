@@ -54,7 +54,7 @@ const Dashboard: React.FC = () => {
         await Promise.all(salonData.map(async (salon: Salon) => {
           try {
             const [ordersRes, servicesRes, staffRes] = await Promise.all([
-              fetch(`http://localhost:4000/api/orders/${salon._id}`),
+              fetch(`http://localhost:4000/api/orders/pay/${salon._id}`),
               fetch(`http://localhost:4000/api/services/${salon._id}`),
               fetch(`http://localhost:4000/api/staffs/${salon._id}`)
             ]);
@@ -63,11 +63,18 @@ const Dashboard: React.FC = () => {
               const salonOrders = await ordersRes.json();
               allOrders = [...allOrders, ...salonOrders];
               
+              // Fixed revenue calculation - safely calculate price
               salonOrders.forEach((order: Order) => {
-                if (order.service && order.service.price) {
-                  totalRevenue += order.service.price;
+                // Parse price as number and add to total if valid
+                const orderPrice = parseFloat(order.price?.toString() || '0');
+                if (!isNaN(orderPrice)) {
+                  totalRevenue += orderPrice;
                 }
               });
+              
+              // Debug logging to check order data and revenue calculation
+              console.log('Salon ID:', salon._id, 'Orders:', salonOrders.length);
+              console.log('Current total revenue:', totalRevenue);
             }
             
             if (servicesRes.ok) {
@@ -86,14 +93,22 @@ const Dashboard: React.FC = () => {
         
         setOrders(allOrders);
         
+        // Format revenue to have 2 decimal places for display
+        const formattedRevenue = parseFloat(totalRevenue.toFixed(2));
+        
         // Set statistics
         setStats({
           totalSalons: salonData.length,
           totalServices: servicesCount,
           totalStaff: staffCount,
           totalOrders: allOrders.length,
-          revenue: totalRevenue
+          revenue: formattedRevenue
         });
+        
+        // Update monthly data with actual order counts if available
+        if (allOrders.length > 0) {
+          updateChartData(allOrders);
+        }
         
         setLoading(false);
       } catch (err) {
@@ -105,6 +120,61 @@ const Dashboard: React.FC = () => {
 
     fetchData();
   }, []);
+  
+  // Function to update chart data based on actual orders
+  const updateChartData = (orders: Order[]) => {
+    try {
+      // Group orders by month
+      const monthlyOrders: Record<string, { orders: number, revenue: number }> = {
+        'Jan': { orders: 0, revenue: 0 },
+        'Feb': { orders: 0, revenue: 0 },
+        'Mar': { orders: 0, revenue: 0 },
+        'Apr': { orders: 0, revenue: 0 },
+        'May': { orders: 0, revenue: 0 },
+        'Jun': { orders: 0, revenue: 0 }
+      };
+      
+      orders.forEach(order => {
+        // Only process orders with valid dates
+        if (order.date) {
+          const orderDate = new Date(order.date);
+          const month = orderDate.getMonth();
+          const monthName = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][month];
+          
+          // Only process if it's within our chart months
+          if (monthlyOrders[monthName]) {
+            monthlyOrders[monthName].orders += 1;
+            
+            // Add price to revenue if valid
+            const orderPrice = parseFloat(order.price?.toString() || '0');
+            if (!isNaN(orderPrice)) {
+              monthlyOrders[monthName].revenue += orderPrice;
+            }
+          }
+        }
+      });
+      
+      // Convert to array format for chart
+      const updatedChartData = Object.keys(monthlyOrders).map(month => ({
+        name: month,
+        orders: monthlyOrders[month].orders,
+        revenue: monthlyOrders[month].revenue
+      }));
+      
+      setMonthlyData(updatedChartData);
+    } catch (err) {
+      console.error('Error updating chart data:', err);
+    }
+  };
+
+  // Helper function to format currency
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2
+    }).format(amount);
+  };
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div></div>;
   
@@ -155,6 +225,7 @@ const Dashboard: React.FC = () => {
         />
         <DashboardCard 
           title="Revenue" 
+          // Display formatted currency
           count={stats.revenue} 
           icon={<DollarSign size={24} color="#ef4444" />} 
           color="border-red-500" 
@@ -172,7 +243,10 @@ const Dashboard: React.FC = () => {
               <XAxis dataKey="name" />
               <YAxis yAxisId="left" />
               <YAxis yAxisId="right" orientation="right" />
-              <Tooltip />
+              <Tooltip formatter={(value, name) => [
+                name === 'revenue' ? formatCurrency(Number(value)) : value,
+                name === 'revenue' ? 'Revenue' : 'Orders'
+              ]}/>
               <Legend />
               <Line yAxisId="left" type="monotone" dataKey="orders" stroke="#8884d8" activeDot={{ r: 8 }} />
               <Line yAxisId="right" type="monotone" dataKey="revenue" stroke="#82ca9d" />

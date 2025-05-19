@@ -12,6 +12,7 @@ import BookingsPage from './pages/OrdersPage';
 import BookingDetailPage from './pages/BookingDetailPage';
 import ProfilePage from './pages/ProfilePage';
 import PaymentPage from './pages/PaymentPage';
+import SalonMap from './pages/SalonMapPage';
 
 const App: React.FC = () => {
   return (
@@ -28,8 +29,9 @@ const App: React.FC = () => {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/salon/:salonId/services/:serviceId" element={<ServiceDetailPage />} />
             <Route path="/bookings" element={<BookingsPage />} />
-            <Route path="/booking/:bookingId" element={<BookingDetailPage />} />
+            <Route path="/booking/:orderId" element={<BookingDetailPage />} />
             <Route path="/payment/:orderId" element={<PaymentPage />} />
+            <Route path="/map" element={<SalonMap/>} />
           </Routes>
         </Router>
     </AuthProvider>

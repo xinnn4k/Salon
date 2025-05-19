@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Button from '../UI/Button';
 import { Calendar, MapPin, Search, Clock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface SearchSectionProps {
   className?: string;
@@ -19,6 +20,7 @@ const SearchSection: React.FC<SearchSectionProps> = ({
     date: '',
     time: ''
   });
+  const navigate = useNavigate();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -57,19 +59,23 @@ const SearchSection: React.FC<SearchSectionProps> = ({
             </div>
             
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <MapPin size={18} className="text-gray-400" />
+              {/* Location button with animated border */}
+              <div className="relative group">
+                {/* Animated border effect */}
+                <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-md opacity-75 group-hover:opacity-100 blur-sm group-hover:blur transition duration-1000 animate-spin-slow"></div>
+                <button
+                  type="button"
+                  onClick={() => navigate('/map')}
+                  className="relative w-full p-2 pl-10 bg-white border border-transparent rounded-md focus:ring-purple-500 focus:border-purple-500 text-left text-gray-900 flex items-center"
+                >
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <MapPin size={18} className="text-gray-400 group-hover:text-purple-500 transition-colors" />
+                  </div>
+                  <span className="group-hover:text-purple-700 transition-colors">Байршил</span>
+                </button>
               </div>
-              <input
-                type="text"
-                name="location"
-                value={searchParams.location}
-                onChange={handleInputChange}
-                placeholder="Байршил"
-                className="w-full p-2 pl-10 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500 text-gray-900"
-              />
             </div>
-            
+
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Calendar size={18} className="text-gray-400" />
