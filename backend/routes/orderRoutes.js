@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 const Order = require('../models/Order');
 
-// Get Orders for a salon
-router.get('/:salonId', async (req, res) => {
+
+router.get('/pay/:salonId', async (req, res) => {
     try {
         const orders = await Order.find({ salonId: req.params.salonId })
             .populate('serviceId')
@@ -14,13 +14,13 @@ router.get('/:salonId', async (req, res) => {
     }
 });
 
-// Get single Order by ID
-router.get('/:salonId/:orderId', async (req, res) => {
+
+router.get('/:orderId', async (req, res) => {
     try {
         const order = await Order.findOne({ 
             _id: req.params.orderId,
-            salonId: req.params.salonId 
         })
+        .populate('salonId')
         .populate('serviceId')
         .populate('staffId');
         
@@ -34,7 +34,7 @@ router.get('/:salonId/:orderId', async (req, res) => {
     }
 });
 
-// Book a new Order
+
 router.post('/:salonId', async (req, res) => {
     try {
         const order = new Order({
@@ -48,7 +48,7 @@ router.post('/:salonId', async (req, res) => {
     }
 });
 
-// Update an Order
+
 router.put('/:salonId/:orderId', async (req, res) => {
     try {
         const order = await Order.findOneAndUpdate(
@@ -70,7 +70,7 @@ router.put('/:salonId/:orderId', async (req, res) => {
     }
 });
 
-// Delete an Order
+
 router.delete('/:salonId/:orderId', async (req, res) => {
     try {
         const order = await Order.findOneAndDelete({ 

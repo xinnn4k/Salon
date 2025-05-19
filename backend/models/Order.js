@@ -1,3 +1,4 @@
+
 const mongoose = require('mongoose');
 
 const orderSchema = new mongoose.Schema({
@@ -8,7 +9,22 @@ const orderSchema = new mongoose.Schema({
     customerPhone: String,
     date: String, // or Date
     time: String,
-    status: { type: String, default: 'booked' },
+    status: { 
+        type: String, 
+        enum: ['booked', 'confirmed', 'completed', 'cancelled'],
+        default: 'booked' 
+    },
+    paymentStatus: {
+        type: String,
+        enum: ['pending', 'paid', 'refunded', 'failed'],
+        default: 'pending'
+    },
+    price: {
+        type: Number,
+        required: true
+    }
+}, {
+    timestamps: true
 });
 
 module.exports = mongoose.model('Order', orderSchema);

@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const Category = require('../models/Category');
+const multer = require('multer');
+
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
 
 
@@ -15,26 +19,83 @@ router.get('/', async (req, res) => {
   }
 });
 
-
+router.get('/subcategory/:subcategoryId', async (req, res) => {
+  try {
+    const { subcategoryId } = req.params;
+    
+    const categories = await Category.find({});
+    
+    let foundSubcategory = null;
+    let parentCategory = null;
+    
+    for (const category of categories) {
+      const subcategory = category.subcategories.id(subcategoryId);
+      if (subcategory) {
+        foundSubcategory = subcategory;
+        parentCategory = category;
+        break;
+      }
+    }
+    
+    if (!foundSubcategory) {
+      return res.status(404).json({ message: 'Subcategory not found' });
+    }
+    
+    const formattedSubcategory = foundSubcategory.toObject();
+    
+    // Format image if it exists
+    if (foundSubcategory.image && foundSubcategory.image.data) {
+      const base64Image = Buffer.from(foundSubcategory.image.data).toString('base64');
+      formattedSubcategory.image = `data:${foundSubcategory.image.contentType};base64,${base64Image}`;
+    }
+    
+    // Add parent category info if needed
+    formattedSubcategory.categoryId = parentCategory._id;
+    formattedSubcategory.categoryName = parentCategory.name;
+    
+    res.json(formattedSubcategory);
+  } catch (err) {
+    console.error('Error fetching subcategory:', err);
+    if (err.kind === 'ObjectId') {
+      return res.status(404).json({ message: 'Invalid subcategory ID' });
+    }
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
 
 
 router.get('/:id', async (req, res) => {
   try {
     const category = await Category.findById(req.params.id);
-    
+
     if (!category) {
       return res.status(404).json({ message: 'Category not found' });
     }
-    
-    res.json(category);
+
+    if (!category.subcategories || category.subcategories.length === 0) {
+      return res.status(200).json([]); // Return empty array if no subcategories
+    }
+
+    const formattedCategories = category.subcategories.map(sub => {
+      const catObj = sub.toObject();
+      if (sub.image && sub.image.data) {
+        const base64Image = Buffer.from(sub.image.data).toString('base64');
+        catObj.image = `data:${sub.image.contentType};base64,${base64Image}`;
+      }
+      return catObj;
+    });
+
+
+    res.json(formattedCategories);
   } catch (err) {
-    console.error(err);
+    console.error('Error fetching category:', err);
     if (err.kind === 'ObjectId') {
-      return res.status(404).json({ message: 'Category not found' });
+      return res.status(404).json({ message: 'Invalid category ID' });
     }
     res.status(500).json({ message: 'Server Error' });
   }
 });
+
 
 
 
@@ -126,89 +187,67 @@ router.delete('/:id', async (req, res) => {
 
 
 
-
-router.post('/:id/subcategories', async (req, res) => {
-  const { name, description } = req.body;
-  
+router.post('/:categoryId/subcategories', upload.single('image'), async (req, res) => {
   try {
-    const category = await Category.findById(req.params.id);
-    
-    if (!category) {
-      return res.status(404).json({ message: 'Category not found' });
-    }
-    
-    const existingSubcategory = category.subcategories.find(
-      sub => sub.name.toLowerCase() === name.toLowerCase()
-    );
-    
-    if (existingSubcategory) {
-      return res.status(400).json({ message: 'Subcategory with this name already exists in this category' });
-    }
-    
+    const { categoryId } = req.params;
+    const { name, description } = req.body;
+
+    if (!name) return res.status(400).json({ error: 'Subcategory name is required' });
+
+    const category = await Category.findById(categoryId);
+    if (!category) return res.status(404).json({ error: 'Category not found' });
+
     const newSubcategory = {
       name,
-      description
+      description,
     };
-    
+
+    if (req.file) {
+      newSubcategory.image = {
+        data: req.file.buffer,
+        contentType: req.file.mimetype,
+      };
+    }
+
     category.subcategories.push(newSubcategory);
     await category.save();
-    
-    const addedSubcategory = category.subcategories[category.subcategories.length - 1];
-    res.status(201).json(addedSubcategory);
-  } catch (err) {
-    console.error(err);
-    if (err.kind === 'ObjectId') {
-      return res.status(404).json({ message: 'Category not found' });
-    }
-    res.status(500).json({ message: 'Server Error' });
+
+    res.status(201).json(category.subcategories[category.subcategories.length - 1]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-
-
-
-router.put('/:categoryId/subcategories/:subcategoryId', async (req, res) => {
-  const { name, description } = req.body;
-  
+router.put('/:categoryId/subcategories/:subcategoryId', upload.single('image'), async (req, res) => {
   try {
-    const category = await Category.findById(req.params.categoryId);
-    
-    if (!category) {
-      return res.status(404).json({ message: 'Category not found' });
-    }
-    
-    const subcategory = category.subcategories.id(req.params.subcategoryId);
-    
-    if (!subcategory) {
-      return res.status(404).json({ message: 'Subcategory not found' });
-    }
-    
-    if (name) {
-      const existingSubcategory = category.subcategories.find(
-        sub => sub.name.toLowerCase() === name.toLowerCase() && 
-              sub._id.toString() !== req.params.subcategoryId
-      );
-      
-      if (existingSubcategory) {
-        return res.status(400).json({ message: 'Subcategory with this name already exists in this category' });
-      }
-    }
-    
+    const { categoryId, subcategoryId } = req.params;
+    const { name, description } = req.body;
+
+    const category = await Category.findById(categoryId);
+    if (!category) return res.status(404).json({ error: 'Category not found' });
+
+    const subcategory = category.subcategories.id(subcategoryId);
+    if (!subcategory) return res.status(404).json({ error: 'Subcategory not found' });
+
     if (name) subcategory.name = name;
-    if (description !== undefined) subcategory.description = description;
-    
-    await category.save();
-    res.json(subcategory);
-  } catch (err) {
-    console.error(err);
-    if (err.kind === 'ObjectId') {
-      return res.status(404).json({ message: 'Category or subcategory not found' });
+    if (description) subcategory.description = description;
+
+    if (req.file) {
+      subcategory.image = {
+        data: req.file.buffer,
+        contentType: req.file.mimetype,
+      };
     }
-    res.status(500).json({ message: 'Server Error' });
+
+    await category.save();
+
+    res.json(subcategory);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
-
-
 
 
 router.delete('/:categoryId/subcategories/:subcategoryId', async (req, res) => {
@@ -219,13 +258,15 @@ router.delete('/:categoryId/subcategories/:subcategoryId', async (req, res) => {
       return res.status(404).json({ message: 'Category not found' });
     }
     
-    const subcategory = category.subcategories.id(req.params.subcategoryId);
+    const subcategoryIndex = category.subcategories.findIndex(
+      sub => sub._id.toString() === req.params.subcategoryId
+    );
     
-    if (!subcategory) {
+    if (subcategoryIndex === -1) {
       return res.status(404).json({ message: 'Subcategory not found' });
     }
     
-    await subcategory.findByIdAndDelete(req.params.id);
+    category.subcategories.splice(subcategoryIndex, 1);
 
     await category.save();
     

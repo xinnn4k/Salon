@@ -1,41 +1,40 @@
 import React, { useState } from 'react';
 import LoginImage from '../assets/image.png';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const SignupPage: React.FC = () => {
   const navigate = useNavigate();
+  const { signup, error: authError, loading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [repeatPassword, setRepeatPassword] = useState('');
-  const [error, setError] = useState('');
+  const [formError, setFormError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Clear previous errors
+    setFormError('');
+
     if (!email || !password || !repeatPassword) {
-      setError('Бүх талбарыг бөглөнө үү');
+      setFormError('Бүх талбарыг бөглөнө үү');
       return;
     }
 
     if (password !== repeatPassword) {
-      setError('Нууц үг таарахгүй байна');
+      setFormError('Нууц үг таарахгүй байна');
       return;
     }
 
-    const userData = {
-      id: Date.now().toString(),
-      email,
-      password,
-    };
-
-    localStorage.setItem('signupUser', JSON.stringify(userData));
-
-
-    const users = JSON.parse(localStorage.getItem("users") || "[]");
-    users.push(userData);
-    localStorage.setItem("users", JSON.stringify(users));
-
-    navigate('/login');
+    try {
+      await signup(email, password);
+      // Redirect to login page on successful registration
+      navigate('/login');
+    } catch (err) {
+      console.error('Signup failed:', err);
+      // Error is handled in auth context and displayed via authError
+    }
   };
 
   return (
@@ -57,17 +56,23 @@ const SignupPage: React.FC = () => {
       <div className="flex flex-col justify-center items-center w-full lg:w-1/2 px-8">
         <h1 className="text-3xl font-bold mb-6">Сайн уу, тавтай морил!</h1>
         <form className="w-full max-w-md" onSubmit={handleSubmit}>
-          {error && <p className="text-red-600 mb-2">{error}</p>}
+          {(formError || authError) && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+              {formError || authError}
+            </div>
+          )}
           <div className="">
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
                Имайл
             </label>
             <input
               type="email"
+              id="email"
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-3 mb-4 border rounded-md"
+              className="w-full p-3 mb-4 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              required
             />
           </div>
           <div className="">
@@ -76,26 +81,34 @@ const SignupPage: React.FC = () => {
             </label>
             <input
               type="password"
+              id="password"
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-3 mb-4 border rounded-md"
+              className="w-full p-3 mb-4 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              required
             />
           </div>
           <div className="">
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="repeatPassword" className="block text-sm font-medium text-gray-700 mb-1">
               Нууц үг давтах
             </label>
             <input
               type="password"
+              id="repeatPassword"
               placeholder="Repeat password"
               value={repeatPassword}
               onChange={(e) => setRepeatPassword(e.target.value)}
-              className="w-full p-3 mb-4 border rounded-md"
+              className="w-full p-3 mb-4 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              required
             />
           </div>
-          <button type="submit" className="w-full bg-blue-600 text-white p-3 rounded-md font-semibold">
-            Бүртгүүлэх
+          <button 
+            type="submit" 
+            className="w-full bg-blue-600 text-white p-3 rounded-md font-semibold hover:bg-blue-700 transition duration-200 disabled:bg-blue-400"
+            disabled={loading}
+          >
+            {loading ? 'Уншиж байна...' : 'Бүртгүүлэх'}
           </button>
           <p className="mt-4 text-center">
             Та бүртгэлтэй бол <Link to="/login" className="text-blue-600 font-semibold">Нэвтрэх</Link>

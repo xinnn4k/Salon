@@ -68,7 +68,7 @@ const ProfilePage: React.FC = () => {
     }
 
     // Load user data
-    const storedUser = localStorage.getItem('signupUser');
+    const storedUser = localStorage.getItem('user');
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
       setUser(parsedUser);
@@ -98,7 +98,7 @@ const ProfilePage: React.FC = () => {
     }
   };
   
-  const handleUpdate = (e: React.FormEvent) => {
+  const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!form.email || !form.password) {
@@ -107,28 +107,28 @@ const ProfilePage: React.FC = () => {
       return;
     }
 
-    // Validate phone number format if provided
-    if (form.phone && !/^\d{8}$/.test(form.phone)) {
-      setPopupMessage('Утасны дугаар 8 оронтой байх ёстой.');
+    try {
+      const res = await fetch(`http://localhost:4000/api/users/${authUser?.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(form),
+      });
+
+      if (!res.ok) throw new Error('Failed to update');
+
+      const updatedUser = await res.json();
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      setPopupMessage('Амжилттай хадгалагдлаа!');
       setShowPopup(true);
-      return;
+    } catch (err) {
+      setPopupMessage('Алдаа гарлаа. Дахин оролдоно уу.');
+      setShowPopup(true);
     }
-
-    const updatedUser = { 
-      ...user, 
-      email: form.email, 
-      password: form.password,
-      name: form.name,
-      phone: form.phone,
-    };
-    
-    localStorage.setItem('signupUser', JSON.stringify(updatedUser));
-    localStorage.setItem('user', JSON.stringify(updatedUser)); // Update current login
-    setUser(updatedUser);
-
-    setPopupMessage('Амжилттай хадгалагдлаа!');
-    setShowPopup(true);
   };
+
 
   const handleCancelEdit = () => {
     // Reset form to original user data

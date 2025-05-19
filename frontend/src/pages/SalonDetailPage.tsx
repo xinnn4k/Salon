@@ -93,7 +93,7 @@ const SalonDetailPage: React.FC = () => {
       try {
         if (!id) return;
         
-        const response = await fetch(`http://localhost:4000/api/staff/${id}`);
+        const response = await fetch(`http://localhost:4000/api/staffs/${id}`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch staff');

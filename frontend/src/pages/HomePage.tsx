@@ -6,6 +6,7 @@ import { useCategories } from '../hooks/useCategories';
 import HorizontalCardList from '../components/UI/HorizontalCardList';
 import { Calendar, MapPin, Search } from 'lucide-react';
 import SearchSection from '../components/UI/SearchSection';
+import CategoryDisplay from '../components/UI/CategoriesDisplay';
 
 
 const HomePage: React.FC = () => {
@@ -29,27 +30,7 @@ const HomePage: React.FC = () => {
         </div>
       </section>
 
-      <section className="py-12">
-        <div className="max-w-screen-xl mx-auto px-4">
-          <h2 className="text-2xl font-bold mb-6">Ангилал</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {categories.map((category) => {
-              const Icon = category.icon as React.ElementType;
-              return (
-                <Link
-                  key={category.id}
-                  to={`/category/${category.id}`}
-                  state={{ name: category.name }}
-                  className="block p-4 border rounded-lg hover:shadow-lg transition-shadow text-center"
-                >
-                  <Icon className="text-purple-500 text-3xl mx-auto mb-2" />
-                  <span>{category.name}</span>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+      <CategoryDisplay/>
       
       <section className="py-12 bg-gray-50">
         <div className="max-w-screen-xl mx-auto px-4">

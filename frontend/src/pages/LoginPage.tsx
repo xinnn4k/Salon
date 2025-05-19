@@ -11,7 +11,6 @@ const LoginPage: React.FC = () => {
   const { login, loading, error, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   
-
   useEffect(() => {
     if (isAuthenticated) {
       navigate('/');
@@ -20,14 +19,17 @@ const LoginPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError('');
+    
     try {
       await login(email, password);
+      // If successful, the useEffect above will handle navigation
     } catch (err) {
       console.error('Login failed in LoginPage:', err);
+      // Error is handled in auth context and displayed via the error state
     }
   };
   
-
   return (
     <div className="min-h-screen flex relative">
       <Link to="/" className="block absolute top-4 left-4 text-gray-700">
@@ -54,7 +56,6 @@ const LoginPage: React.FC = () => {
       <div className="flex flex-col justify-center items-center w-full lg:w-1/2 px-8">
         <h1 className="text-3xl font-bold mb-6">Дахин тавтай морил</h1>
 
-        
         <form className="w-full max-w-md" onSubmit={handleSubmit}>
           {(error || formError) && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -101,7 +102,6 @@ const LoginPage: React.FC = () => {
             type="submit"
             className="w-full bg-blue-600 text-white p-3 rounded-md font-semibold hover:bg-blue-700 transition duration-200 disabled:bg-blue-400"
             disabled={loading}
-            onClick={(e) => {console.log("Button clicked");}}
           >
             {loading ? 'Уншиж байна...' : 'Нэвтрэх'}
           </button>

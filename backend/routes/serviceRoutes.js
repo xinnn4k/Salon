@@ -54,6 +54,8 @@ router.post('/:salonId', upload.single('image'), async (req, res) => {
             price: req.body.price,
             description: req.body.description,
             salonId: req.params.salonId,
+            categoryId: req.body.categoryId,
+            subcategoryId: req.body.subcategoryId,
             image: req.file?.buffer || null,
         });
         await service.save();

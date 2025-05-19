@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Salon = require('../models/Salon');
+const Service = require('../models/Service');
 const multer = require('multer');
 const mongoose = require('mongoose');
 
@@ -27,6 +28,35 @@ router.get('/', async (req, res) => {
     }
 });
 
+router.get('/by-subcategory/:subcategoryId', async (req, res) => {
+    try {
+        const { subcategoryId } = req.params;
+        
+        if (!mongoose.Types.ObjectId.isValid(subcategoryId)) {
+            return res.status(400).json({ message: 'Invalid subcategory ID' });
+        }
+        
+        const services = await Service.find({ subcategoryId });
+        
+        const salonIds = [...new Set(services.map(service => service.salonId))];
+        
+        const salons = await Salon.find({ _id: { $in: salonIds } });
+        
+        const formattedSalons = salons.map(salon => {
+            const salonObj = salon.toObject();
+            if (salon.image) {
+                const base64Image = salon.image.toString('base64');
+                salonObj.image = `data:image/jpeg;base64,${base64Image}`;
+            }
+            return salonObj;
+        });
+        
+        res.json(formattedSalons);
+    } catch (err) {
+        console.error('Error fetching salons by subcategory:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
 
 router.get('/:id', async (req, res) => {
     try {

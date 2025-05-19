@@ -8,17 +8,15 @@ import SubcategoryDetailPage from './pages/SubCatePage';
 import SalonDetailPage from './pages/SalonDetailPage';
 import ServiceDetailPage from './pages/ServiceDetailPage';
 import { AuthProvider } from './contexts/AuthContext';
-import BookingsPage from './pages/BookingsPage';
+import BookingsPage from './pages/OrdersPage';
 import BookingDetailPage from './pages/BookingDetailPage';
-import { BookingProvider } from './contexts/BookingContext';
 import ProfilePage from './pages/ProfilePage';
 import PaymentPage from './pages/PaymentPage';
 
 const App: React.FC = () => {
   return (
     <AuthProvider>
-      <BookingProvider>
-    `    <Router>
+        <Router>
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/category/:id" element={<CategoryPage />} />
@@ -31,10 +29,9 @@ const App: React.FC = () => {
             <Route path="/salon/:salonId/services/:serviceId" element={<ServiceDetailPage />} />
             <Route path="/bookings" element={<BookingsPage />} />
             <Route path="/booking/:bookingId" element={<BookingDetailPage />} />
-            <Route path="/payment/:bookingId" element={<PaymentPage />} />
+            <Route path="/payment/:orderId" element={<PaymentPage />} />
           </Routes>
-        </Router>`
-      </BookingProvider>
+        </Router>
     </AuthProvider>
   );
 };

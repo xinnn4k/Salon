@@ -7,6 +7,8 @@ const staffRoutes = require('./routes/staffRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const authRoutes = require('./routes/authRoute');
 const categoryRoutes = require('./routes/categoryRoute');
+const userRoutes = require('./routes/userRoute');
+const paymentRoutes = require('./routes/paymentRoute');
 
 
 require('dotenv').config();
@@ -28,6 +30,9 @@ app.use('/api/staffs', staffRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/payments', paymentRoutes);
+
 
 app.get('/', (req, res) => {
     res.send('Salon Booking Backend is running');

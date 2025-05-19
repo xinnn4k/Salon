@@ -54,7 +54,7 @@ const SalonDashboard: React.FC = () => {
         setStaff(staffData);
         
         // Fetch orders
-        const ordersResponse = await fetch(`http://localhost:4000/api/orders/${salonId}`);
+        const ordersResponse = await fetch(`http://localhost:4000/api/orders/pay/${salonId}`);
         if (!ordersResponse.ok) throw new Error('Failed to fetch orders');
         const ordersData = await ordersResponse.json();
         setOrders(ordersData);

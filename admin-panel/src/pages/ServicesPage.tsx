@@ -9,6 +9,7 @@ interface Service {
   image?: string;
   salonId: string;
   categoryId?: string;
+  subcategoryId?: string; // Added subcategoryId to the Service interface
 }
 
 interface Category {
@@ -46,7 +47,7 @@ const ServicesPage: React.FC = () => {
   const [currentServiceId, setCurrentServiceId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   
-  // Form state
+
   const initialFormState: ServiceFormData = {
     name: '',
     price: '',
@@ -65,7 +66,7 @@ const ServicesPage: React.FC = () => {
     }
   }, [salonId]);
 
-  // Load services for the salon
+
   const loadServices = async () => {
     if (!salonId) return;
     
@@ -77,6 +78,11 @@ const ServicesPage: React.FC = () => {
       }
       const data = await response.json();
       setServices(data);
+      
+      // Debug information about loaded services
+      const hasCategoryIds = data.some((service: { categoryId: any; }) => service.categoryId);
+      const hasSubcategoryIds = data.some((service: { subcategoryId: any; }) => service.subcategoryId);
+      
       setError(null);
     } catch (err) {
       setError('Failed to load services');
@@ -85,7 +91,7 @@ const ServicesPage: React.FC = () => {
     }
   };
 
-  // Load all available categories
+
   const loadCategories = async () => {
     try {
       const response = await fetch(`${API_URL}/categories`);
@@ -99,12 +105,12 @@ const ServicesPage: React.FC = () => {
     }
   };
   
-  // Handle form input changes
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     
-    // If the category changes, update the selected category and reset subcategory
+
     if (name === 'categoryId') {
       const category = categories.find(cat => cat._id === value) || null;
       setSelectedCategory(category);
@@ -117,11 +123,11 @@ const ServicesPage: React.FC = () => {
     setFormData(prev => ({ ...prev, image: file }));
   };
 
-  // Handle selecting a pre-defined service from a category
+
   const handleServiceSelection = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const serviceId = e.target.value;
     if (serviceId && selectedCategory) {
-      // If a subcategory is selected
+
       const subcategory = selectedCategory.subcategories.find(sub => sub._id === serviceId);
       if (subcategory) {
         setFormData(prev => ({
@@ -153,7 +159,7 @@ const ServicesPage: React.FC = () => {
       description: service.description,
       image: null,
       categoryId: service.categoryId || '',
-      subcategoryId: ''
+      subcategoryId: service.subcategoryId || '' // Load the subcategoryId if it exists
     });
     
     if (service.categoryId) {
@@ -180,14 +186,8 @@ const ServicesPage: React.FC = () => {
       formDataObj.append('name', formData.name);
       formDataObj.append('price', formData.price);
       formDataObj.append('description', formData.description);
-      
-      if (formData.categoryId) {
-        formDataObj.append('categoryId', formData.categoryId);
-      }
-      
-      if (formData.subcategoryId) {
-        formDataObj.append('subcategoryId', formData.subcategoryId);
-      }
+      formDataObj.append('categoryId', formData.categoryId);
+      formDataObj.append('subcategoryId', formData.subcategoryId);
       
       if (formData.image) {
         formDataObj.append('image', formData.image);
@@ -203,17 +203,26 @@ const ServicesPage: React.FC = () => {
       
       const response = await fetch(url, {
         method,
-        body: formDataObj,
+        body: formDataObj
       });
       
       if (!response.ok) {
-        throw new Error(`Failed to ${isEditMode ? 'update' : 'create'} service`);
+        const errorText = await response.text();
+        console.error('Server error:', errorText);
+        throw new Error(`Failed to ${isEditMode ? 'update' : 'create'} service: ${errorText}`);
+      }
+      
+      try {
+        const responseData = await response.json();
+      } catch (e) {
+        console.log('Service saved (could not parse response body)');
       }
       
       // Close modal and reload services
       closeModal();
       loadServices();
     } catch (err) {
+      console.error('Error saving service:', err);
       setError(`Failed to ${isEditMode ? 'update' : 'create'} service`);
     }
   };
@@ -250,6 +259,7 @@ const ServicesPage: React.FC = () => {
         </button>
       </div>
 
+
       {loading ? (
         <div className="text-center py-10">Loading...</div>
       ) : error ? (
@@ -282,7 +292,7 @@ const ServicesPage: React.FC = () => {
                   <p className="text-gray-600 mb-4">
                     <span className="font-medium">Description:</span> {service.description}
                   </p>
-                  <div className="flex justify-end space-x-2">
+                  <div className="flex justify-end space-x-2 mt-2">
                     <button
                       onClick={() => openEditModal(service)}
                       className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded"
@@ -320,7 +330,7 @@ const ServicesPage: React.FC = () => {
             </div>
             
             <form onSubmit={handleSubmit}>
-              {/* Category Selection */}
+
               <div className="mb-4">
                 <label className="block text-gray-700 text-sm font-bold mb-2">
                   Service Category
@@ -340,7 +350,7 @@ const ServicesPage: React.FC = () => {
                 </select>
               </div>
               
-              {/* Subcategory/Predefined Service Selection */}
+
               {selectedCategory && selectedCategory.subcategories.length > 0 && (
                 <div className="mb-4">
                   <label className="block text-gray-700 text-sm font-bold mb-2">

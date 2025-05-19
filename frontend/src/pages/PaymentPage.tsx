@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout/Layout';
 import { 
   CreditCard, CheckCircle, AlertCircle, ArrowLeft, 
-  Lock, Calendar, ChevronsRight, CheckSquare, Info 
+  Lock, Calendar, ChevronsRight, Info 
 } from 'lucide-react';
-import { FaArrowLeft } from 'react-icons/fa';
 
 interface PaymentPageProps {}
 
@@ -17,15 +16,60 @@ interface PaymentDetails {
   saveCard: boolean;
 }
 
+interface OrderDetails {
+  _id: string;
+  salonId: {
+    _id: string;
+    name: string;
+  };
+  serviceId: {
+    _id: string;
+    name: string;
+  };
+  staffId: {
+    _id: string;
+    name: string;
+  };
+  customerName: string;
+  customerPhone: string;
+  date: string;
+  time: string;
+  status: string;
+  paymentStatus: string;
+  price: number;
+  salonName?: string; // Added for display purposes
+}
+
+interface QPayData {
+  qrImage: string;
+  expiresAt: string;
+}
+
+interface PaymentResponse {
+  success: boolean;
+  payment: {
+    _id: string;
+    orderId: string;
+    amount: number;
+    paymentMethod: string;
+    status: string;
+    cardLastFour?: string;
+  };
+  qrData?: QPayData;
+  message: string;
+}
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
+
 const PaymentPage: React.FC<PaymentPageProps> = () => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { bookingId } = useParams<{ bookingId: string }>();
+  const { orderId } = useParams<{ orderId: string }>();
   const [isLoading, setIsLoading] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [bookingDetails, setBookingDetails] = useState<any>(null);
+  const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'qpay'>('card');
+  const [qpayData, setQpayData] = useState<QPayData | null>(null);
 
   // Payment form state
   const [paymentDetails, setPaymentDetails] = useState<PaymentDetails>({
@@ -37,40 +81,38 @@ const PaymentPage: React.FC<PaymentPageProps> = () => {
   });
 
   useEffect(() => {
-    if (!bookingId) {
+    if (!orderId) {
+      console.log(orderId);
       setErrorMessage("Захиалгын дугаар олдсонгүй");
       return;
     }
 
-    const fetchBookingDetails = () => {
+    const fetchOrderDetails = async () => {
+      setIsLoading(true);
       try {
-        const bookingsJSON = localStorage.getItem('salonBookings');
-        if (!bookingsJSON) {
-          throw new Error("No bookings found");
+        const response = await fetch(`${API_URL}/orders/${orderId}`);
+        
+        if (!response.ok) {
+          throw new Error("Захиалгын мэдээлэл олдсонгүй");
         }
         
-        const bookings = JSON.parse(bookingsJSON);
-        const booking = bookings.find((b: any) => b.bookingId === bookingId);
-        
-        if (!booking) {
-          throw new Error("Booking not found");
-        }
-        
-        setBookingDetails(booking);
+        const data = await response.json();
+        setOrderDetails(data);
       } catch (error) {
-        console.error("Error fetching booking:", error);
+        console.error("Error fetching order:", error);
         setErrorMessage("Захиалгын мэдээлэл олдсонгүй");
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    fetchBookingDetails();
-  }, [bookingId]);
+    fetchOrderDetails();
+  }, [orderId]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
     
     if (name === 'cardNumber') {
-
       const digitsOnly = value.replace(/\D/g, '');
 
       let formattedValue = '';
@@ -90,7 +132,6 @@ const PaymentPage: React.FC<PaymentPageProps> = () => {
       return;
     }
     
-
     if (name === 'expiryDate') {
       const digitsOnly = value.replace(/\D/g, '');
       let formattedValue = digitsOnly;
@@ -122,15 +163,104 @@ const PaymentPage: React.FC<PaymentPageProps> = () => {
     }));
   };
 
-  const validatePaymentDetails = () => {
-    if (paymentMethod === 'qpay') {
-      return true;
-    }
+  const processCardPayment = async () => {
+    if (!orderDetails) return;
     
-    // Card payment validation
+    setIsLoading(true);
+    setErrorMessage(null);
+    
+    try {
+      const response = await fetch(`${API_URL}/payments/card/${orderId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          cardNumber: paymentDetails.cardNumber.replace(/\s/g, ''),
+          cardHolder: paymentDetails.cardHolder,
+          expiryDate: paymentDetails.expiryDate,
+          cvv: paymentDetails.cvv,
+          amount: orderDetails.price
+        }),
+      });
+      
+      const data: PaymentResponse = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || "Төлбөр төлөхөд алдаа гарлаа");
+      }
+      
+      setPaymentSuccess(true);
+      
+      // Redirect after successful payment
+      setTimeout(() => {
+        navigate('/bookings');
+      }, 3000);
+    } catch (error) {
+      console.error("Payment error:", error);
+      setErrorMessage(error instanceof Error ? error.message : "Төлбөр төлөхөд алдаа гарлаа");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const processQpayPayment = async () => {
+    console.log(orderDetails);
+    if (!orderDetails) return;
+    
+    setIsLoading(true);
+    setErrorMessage(null);
+    
+    try {
+      const response = await fetch(`${API_URL}/payments/qpay/${orderId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount: orderDetails.price
+        }),
+      });
+      
+      const data: PaymentResponse = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || "QPay төлбөр үүсгэхэд алдаа гарлаа");
+      }
+      
+      if (data.qrData) {
+        setQpayData(data.qrData);
+      } else {
+        throw new Error("QPay QR код үүсгэхэд алдаа гарлаа");
+      }
+    } catch (error) {
+      console.error("QPay error:", error);
+      setErrorMessage(error instanceof Error ? error.message : "QPay төлбөр үүсгэхэд алдаа гарлаа");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePayment = () => {
+
+    setErrorMessage(null);
+    
+    if (paymentMethod === 'card') {
+
+      if (!validateCardDetails()) {
+        return;
+      }
+      processCardPayment();
+    } else {
+
+      processQpayPayment();
+    }
+  };
+
+  const validateCardDetails = () => {
     const { cardNumber, cardHolder, expiryDate, cvv } = paymentDetails;
     
-    // Remove spaces from card number
+
     const cardNumberDigits = cardNumber.replace(/\s/g, '');
     
     if (cardNumberDigits.length !== 16) {
@@ -152,7 +282,7 @@ const PaymentPage: React.FC<PaymentPageProps> = () => {
     // Check if card is expired
     const [month, year] = expiryDate.split('/');
     const currentDate = new Date();
-    const currentYear = currentDate.getFullYear() % 100; // Get last 2 digits
+    const currentYear = currentDate.getFullYear() % 100; 
     const currentMonth = currentDate.getMonth() + 1;
     
     if (parseInt(year) < currentYear || 
@@ -169,51 +299,39 @@ const PaymentPage: React.FC<PaymentPageProps> = () => {
     return true;
   };
 
-  const handlePayment = () => {
-    if (!validatePaymentDetails()) {
-      return;
-    }
+  // Check QPay payment status
+  const checkQPayStatus = async () => {
+    if (!orderId) return;
     
-    setIsLoading(true);
-    setErrorMessage(null);
-    
-    setTimeout(() => {
-      try {
-        const bookingsJSON = localStorage.getItem('salonBookings');
-        const bookings = bookingsJSON ? JSON.parse(bookingsJSON) : [];
-        
-        const updatedBookings = bookings.map((booking: any) => {
-          if (booking.bookingId === bookingId) {
-            return {
-              ...booking,
-              status: 'confirmed',
-              paymentMethod: paymentMethod,
-              paymentDate: new Date().toISOString(),
-
-              cardLastFour: paymentMethod === 'card' ? 
-                paymentDetails.cardNumber.replace(/\s/g, '').slice(-4) : null
-            };
-          }
-          return booking;
-        });
-        
-        localStorage.setItem('salonBookings', JSON.stringify(updatedBookings));
-        
+    try {
+      const response = await fetch(`${API_URL}/payments/${orderId}`);
+      const payment = await response.json();
+      
+      if (payment.status === 'completed') {
         setPaymentSuccess(true);
         
+        // Redirect after successful payment
         setTimeout(() => {
           navigate('/bookings');
         }, 3000);
-      } catch (error) {
-        console.error("Payment error:", error);
-        setErrorMessage("Төлбөр төлөхөд алдаа гарлаа. Дахин оролдоно уу.");
-      } finally {
-        setIsLoading(false);
       }
-    }, 2000);
+    } catch (error) {
+      console.error("Error checking payment status:", error);
+    }
   };
 
-  if (isLoading && !bookingDetails) {
+  // Poll for QPay payment status if qpayData exists
+  useEffect(() => {
+    if (!qpayData) return;
+    
+    const interval = setInterval(() => {
+      checkQPayStatus();
+    }, 5000); // Check every 5 seconds
+    
+    return () => clearInterval(interval);
+  }, [qpayData]);
+
+  if (isLoading && !orderDetails) {
     return (
       <Layout>
         <div className="flex items-center justify-center h-screen">
@@ -223,7 +341,7 @@ const PaymentPage: React.FC<PaymentPageProps> = () => {
     );
   }
 
-  if (errorMessage && !bookingDetails) {
+  if (errorMessage && !orderDetails) {
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center h-screen">
@@ -266,7 +384,7 @@ const PaymentPage: React.FC<PaymentPageProps> = () => {
               <ArrowLeft size={16} className="mr-1" /> Буцах
             </button>
             <h1 className="text-2xl md:text-3xl font-bold mt-6">Төлбөр төлөх</h1>
-            <p className="text-white/80 mt-2">Захиалгын дугаар: {bookingId}</p>
+            <p className="text-white/80 mt-2">Захиалгын дугаар: {orderId}</p>
           </div>
         </div>
 
@@ -408,31 +526,33 @@ const PaymentPage: React.FC<PaymentPageProps> = () => {
               ) : (
                 /* QPay QR Code */
                 <div className="text-center py-4">
-                  <div className="bg-gray-100 rounded-lg p-6 inline-block mb-4">
-                    {/* SVG QR Code Placeholder */}
-                    <div className="w-48 h-48 mx-auto bg-white p-2 relative">
-                      <div className="grid grid-cols-7 grid-rows-7 w-full h-full gap-1">
-                        {/* Generate a fake QR code pattern */}
-                        {Array(49).fill(0).map((_, i) => (
-                          <div 
-                            key={i} 
-                            className={`${Math.random() > 0.7 ? 'bg-black' : 'bg-transparent'} ${
-                              (i < 7 || i > 41 || i % 7 === 0 || i % 7 === 6) ? 'bg-black' : ''
-                            }`}
-                          ></div>
-                        ))}
+                  {qpayData ? (
+                    <div>
+                      <div className="bg-gray-100 rounded-lg p-6 inline-block mb-4">
+                        <img 
+                          src={qpayData.qrImage} 
+                          alt="QPay QR Code" 
+                          className="w-48 h-48"
+                        />
                       </div>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="bg-white p-2 rounded">
-                          <div className="w-6 h-6 bg-blue-500 rounded-sm flex items-center justify-center text-white font-bold">
-                            Q
-                          </div>
+                      <p className="text-gray-700 mb-2">QR кодыг уншуулж төлбөрөө төлнө үү</p>
+                      <p className="text-sm text-gray-500">
+                        QR код {new Date(qpayData.expiresAt).toLocaleTimeString()} хүртэл хүчинтэй
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-100 rounded-lg p-6 inline-block mb-4">
+                      <div className="w-48 h-48 mx-auto bg-white p-2 relative flex items-center justify-center">
+                        <div className="text-gray-400 text-center">
+                          {isLoading ? (
+                            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                          ) : (
+                            "QR код үүсгэхийн тулд доорх товчийг дарна уу"
+                          )}
                         </div>
                       </div>
                     </div>
-                  </div>
-                  <p className="text-gray-700 mb-2">QR кодыг уншуулж төлбөрөө төлнө үү</p>
-                  <p className="text-sm text-gray-500">QR код 15 минутын дараа хүчингүй болно</p>
+                  )}
                 </div>
               )}
               
@@ -444,7 +564,7 @@ const PaymentPage: React.FC<PaymentPageProps> = () => {
                       : 'bg-blue-600 text-white hover:bg-blue-700'
                   }`}
                   onClick={handlePayment}
-                  disabled={isLoading}
+                  disabled={isLoading || (paymentMethod === 'qpay' && qpayData !== null)}
                 >
                   {isLoading ? (
                     <div className="flex items-center justify-center">
@@ -453,7 +573,7 @@ const PaymentPage: React.FC<PaymentPageProps> = () => {
                     </div>
                   ) : (
                     <div className="flex items-center justify-center">
-                      {paymentMethod === 'card' ? "Төлбөр төлөх" : "Төлбөр баталгаажуулах"}
+                      {paymentMethod === 'card' ? "Төлбөр төлөх" : qpayData ? "Төлбөр хүлээгдэж байна..." : "QPay QR код үүсгэх"}
                       <ChevronsRight size={16} className="ml-1" />
                     </div>
                   )}
@@ -472,31 +592,31 @@ const PaymentPage: React.FC<PaymentPageProps> = () => {
             <div className="bg-white rounded-xl shadow-sm p-6 sticky top-6">
               <h2 className="text-lg font-bold mb-4">Захиалгын хураангуй</h2>
               
-              {bookingDetails && (
+              {orderDetails && (
                 <div className="space-y-4">
                   <div className="pb-4 border-b border-gray-100">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-gray-700">Үйлчилгээ</span>
-                      <span className="font-medium">{bookingDetails.serviceName}</span>
+                      <span className="font-medium">{orderDetails.serviceId?.name || "N/A"}</span>
                     </div>
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-gray-700">Салон</span>
-                      <span className="font-medium">{bookingDetails.salonName}</span>
+                      <span className="font-medium">{orderDetails.salonId?.name || "N/A"}</span>
                     </div>
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-gray-700">Ажилтан</span>
-                      <span className="font-medium">{bookingDetails.staffName}</span>
+                      <span className="font-medium">{orderDetails.staffId?.name || "N/A"}</span>
                     </div>
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-gray-700">Огноо, цаг</span>
-                      <span className="font-medium">{bookingDetails.date}, {bookingDetails.time}</span>
+                      <span className="font-medium">{orderDetails.date}, {orderDetails.time}</span>
                     </div>
                   </div>
                   
                   <div className="pb-4 border-b border-gray-100">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-gray-700">Үйлчилгээний үнэ</span>
-                      <span className="font-medium">{bookingDetails.price}₮</span>
+                      <span className="font-medium">{orderDetails.price}₮</span>
                     </div>
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-gray-700">Хямдрал</span>
@@ -511,7 +631,7 @@ const PaymentPage: React.FC<PaymentPageProps> = () => {
                   <div className="pt-2">
                     <div className="flex justify-between items-center">
                       <span className="font-bold text-gray-900">Нийт төлбөр</span>
-                      <span className="font-bold text-lg text-blue-600">{bookingDetails.price}₮</span>
+                      <span className="font-bold text-lg text-blue-600">{orderDetails.price}₮</span>
                     </div>
                   </div>
                 </div>

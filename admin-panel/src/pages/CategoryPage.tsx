@@ -35,8 +35,8 @@ const CategoryPage: React.FC = () => {
   const [currentCategory, setCurrentCategory] = useState<Category | null>(null);
   const [currentSubcategory, setCurrentSubcategory] = useState<Subcategory | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
-  
-  // Form state
+  const [image, setImage] = useState<File | null>(null);
+
   const [name, setName] = useState<string>('');
   const [description, setDescription] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -175,6 +175,7 @@ const CategoryPage: React.FC = () => {
     }
   };
 
+  
   const handleDeleteCategory = async () => {
     if (!currentCategory) return;
     
@@ -201,25 +202,25 @@ const CategoryPage: React.FC = () => {
 
   const handleCreateSubcategory = async () => {
     if (!currentCategory || !validateForm()) return;
-    
+
     setIsSubmitting(true);
-    
+
     try {
+      const formData = new FormData();
+      formData.append('name', name);
+      formData.append('description', description);
+      if (image) {
+        formData.append('image', image); 
+      }
+
       const response = await fetch(`http://localhost:4000/api/categories/${currentCategory._id}/subcategories`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name,
-          description,
-        }),
+        body: formData,
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to create subcategory');
       }
-      
 
       closeModal();
       loadCategories();
@@ -236,25 +237,25 @@ const CategoryPage: React.FC = () => {
 
   const handleUpdateSubcategory = async () => {
     if (!currentCategory || !currentSubcategory || !validateForm()) return;
-    
+
     setIsSubmitting(true);
-    
+
     try {
+      const formData = new FormData();
+      formData.append('name', name);
+      formData.append('description', description);
+      if (image) {
+        formData.append('image', image); // optionally add a new image
+      }
+
       const response = await fetch(`http://localhost:4000/api/categories/${currentCategory._id}/subcategories/${currentSubcategory._id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name,
-          description,
-        }),
+        body: formData,
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to update subcategory');
       }
-      
 
       closeModal();
       loadCategories();
@@ -264,6 +265,7 @@ const CategoryPage: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+
 
   const handleDeleteSubcategory = async () => {
     if (!currentCategory || !currentSubcategory) return;
@@ -751,6 +753,13 @@ const CategoryPage: React.FC = () => {
                     className="mt-1 block w-full border border-gray-300 rounded shadow-sm py-2.5 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
                   />
                 </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setImage(e.target.files?.[0] || null)}
+                  className="mt-2"
+                />
+
               </div>
               
               <div className="mt-6 flex items-center justify-end space-x-3">

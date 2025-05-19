@@ -3,64 +3,59 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout/Layout';
 import { Star, Clock, Calendar, User, ChevronDown, CheckCircle, AlertCircle } from 'lucide-react';
 import { FaArrowLeft } from 'react-icons/fa';
-import { useCardData } from '../hooks/useSalonData';
 import { useAuth } from '../contexts/AuthContext'; // Import auth hook - make sure you have this
 
 interface ServiceDetailProps {
-    id: string;
+    _id: string;
     name: string;
-    imageUrl: string;
+    image?: string;
     price: number;
+    description?: string;
+    salonId: string;
+}
+
+interface SalonDetailProps {
+    _id: string;
+    name: string;
+    location: string;
+    phone: string;
+    email: string;
+    image?: string;
+    rating?: number;
 }
 
 interface StaffMember {
-  id: number;
+  _id: string;
   name: string;
-  position: string;
-  avatar?: string;
-  specialties: string[];
-  availability: string[];
+  specialty: string;
+  image?: string;
+  email: string;
+  salonId: string;
+  availability?: string[]; // We'll add default availability times
 }
 
 interface BookingDetails {
-  bookingId: string;
-  userId: string; // Added userId field
+  bookingId?: string;
+  userId?: string;
   salonId: string;
-  salonName: string;
+  salonName?: string;
   serviceId: string;
-  serviceName: string;
-  staffId: number;
-  staffName: string;
+  serviceName?: string;
+  staffId: string;
+  staffName?: string;
+  customerName?: string;
+  customerPhone?: string;
   date: string;
   time: string;
-  price: number;
-  bookingDate: string;
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  price?: number;
+  bookingDate?: string;
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'booked';
 }
 
-// Define staffData outside of the component to avoid recreation on each render
-const staffData: StaffMember[] = [
-  {
-    id: 1,
-    name: "Батболд Д.",
-    position: "Ахлах Стилист",
-    specialties: ["Үс Засах", "Үс Стайлинг", "Үс Будалт"],
-    availability: ["10:00 AM", "11:00 AM", "2:00 PM", "3:00 PM", "4:00 PM"]
-  },
-  {
-    id: 2,
-    name: "Оюунаа Т.",
-    position: "Өнгөчин",
-    specialties: ["Үс Будалт", "Үс Стайлинг"],
-    availability: ["9:00 AM", "12:00 PM", "1:00 PM", "5:00 PM"]
-  },
-  {
-    id: 3,
-    name: "Төгөлдөр С.",
-    position: "Барбер",
-    specialties: ["Үс Засах", "Сахал Тайруулах"],
-    availability: ["9:00 AM", "10:00 AM", "11:00 AM", "3:00 PM", "4:00 PM"]
-  }
+// Define default availability times that we'll use since the API doesn't provide them
+const DEFAULT_AVAILABILITY = [
+  "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", 
+  "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM"
 ];
 
 const ServiceDetailPage: React.FC = () => {
@@ -68,9 +63,9 @@ const ServiceDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const [service, setService] = useState<ServiceDetailProps | null>(null);
-  const [salonDetails, setSalonDetails] = useState<any>(null);
-  const [staffMembers] = useState<StaffMember[]>(staffData);
-  const [selectedStaff, setSelectedStaff] = useState<number | null>(null);
+  const [salonDetails, setSalonDetails] = useState<SalonDetailProps | null>(null);
+  const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
+  const [selectedStaff, setSelectedStaff] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [showStaffDropdown, setShowStaffDropdown] = useState(false);
@@ -79,7 +74,7 @@ const ServiceDetailPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [bookingSuccess, setBookingSuccess] = useState(false);
-  const cardDatas = useCardData();
+  const [existingBookings, setExistingBookings] = useState<BookingDetails[]>([]);
 
   useEffect(() => {
     if (!isAuthenticated && errorMessage === null) {
@@ -89,48 +84,73 @@ const ServiceDetailPage: React.FC = () => {
     }
   }, [isAuthenticated, errorMessage]);
 
-  const getExistingBookings = (): BookingDetails[] => {
-    const bookingsJSON = localStorage.getItem('salonBookings');
-    return bookingsJSON ? JSON.parse(bookingsJSON) : [];
-  };
-  
-  const saveBookingToLocalStorage = (booking: BookingDetails) => {
-    const existingBookings = getExistingBookings();
-    const updatedBookings = [...existingBookings, booking];
-    localStorage.setItem('salonBookings', JSON.stringify(updatedBookings));
+  // Fetch existing bookings from the backend
+  const fetchExistingBookings = async () => {
+    if (!salonId) return;
+    
+    try {
+      const response = await fetch(`http://localhost:4000/api/orders/${salonId}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch existing bookings");
+      }
+      const bookingsData = await response.json();
+      setExistingBookings(bookingsData);
+    } catch (error) {
+      console.error("Error fetching existing bookings:", error);
+    }
   };
   
   useEffect(() => {
     if (!salonId || !serviceId) return;
-    if (!cardDatas || cardDatas.length === 0) return;
   
-    if (!service && !salonDetails) {
+    const fetchData = async () => {
       setIsLoading(true);
       setErrorMessage(null);
       
       try {
-        const foundSalon = cardDatas.find(s => s.id === Number(salonId));
-        
-        if (!foundSalon) {
-          throw new Error("Salon not found");
+        // Fetch salon details
+        const salonResponse = await fetch(`http://localhost:4000/api/salons/${salonId}`);
+        if (!salonResponse.ok) {
+          throw new Error("Failed to fetch salon details");
         }
+        const salonData = await salonResponse.json();
         
-        const foundService = foundSalon?.services.find(s => s.id === serviceId);
-        
-        if (!foundService) {
-          throw new Error("Service not found");
+        // Fetch service details
+        const serviceResponse = await fetch(`http://localhost:4000/api/services/${salonId}/${serviceId}`);
+        if (!serviceResponse.ok) {
+          throw new Error("Failed to fetch service details");
         }
+        const serviceData = await serviceResponse.json();
+        
+        // Fetch staff members
+        const staffResponse = await fetch(`http://localhost:4000/api/staffs/${salonId}`);
+        if (!staffResponse.ok) {
+          throw new Error("Failed to fetch staff members");
+        }
+        const staffData = await staffResponse.json();
+        
+        // Add availability to staff members
+        const staffWithAvailability = staffData.map((staff: StaffMember) => ({
+          ...staff,
+          availability: DEFAULT_AVAILABILITY
+        }));
     
-        setSalonDetails(foundSalon);
-        setService(foundService);
+        setSalonDetails(salonData);
+        setService(serviceData);
+        setStaffMembers(staffWithAvailability);
+        
+        // Fetch existing bookings
+        await fetchExistingBookings();
       } catch (error) {
         setErrorMessage("Мэдээлэл олдсонгүй. Дахин оролдоно уу.");
         console.error("Error loading data:", error);
       } finally {
         setIsLoading(false);
       }
-    }
-  }, [salonId, serviceId, cardDatas, service, salonDetails]);
+    };
+
+    fetchData();
+  }, [salonId, serviceId]);
   
   const getNextDays = () => {
     const days = [];
@@ -152,18 +172,15 @@ const ServiceDetailPage: React.FC = () => {
 
   const availableDates = getNextDays();
 
-
   useEffect(() => {
     if (selectedStaff) {
       setSelectedTime('');
     }
   }, [selectedStaff]);
 
-  const handleBooking = () => {
-
+  const handleBooking = async () => {
     if (!isAuthenticated || !user) {
       setErrorMessage("Та үйлчилгээ захиалахын тулд нэвтрэх шаардлагатай");
-
       navigate('/login', { state: { from: `/salon/${salonId}/service/${serviceId}` } });
       return;
     }
@@ -176,44 +193,51 @@ const ServiceDetailPage: React.FC = () => {
     try {
       setIsLoading(true);
       
-      const bookingId = `book-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-      
+      // Create booking details for the API
       const bookingDetails: BookingDetails = {
-        bookingId: bookingId,
-        userId: user.id,
         salonId: salonId || '',
-        salonName: salonDetails?.name || '',
-        serviceId: service?.id || '',
-        serviceName: service?.name || '',
+        serviceId: serviceId || '',
         staffId: selectedStaff,
-        staffName: staffMembers.find(s => s.id === selectedStaff)?.name || '',
+        customerName: user.name || 'Customer',
+        customerPhone:  '',
         date: selectedDate,
         time: selectedTime,
-        price: service?.price || 0,
-        bookingDate: new Date().toISOString(),
-        status: 'pending'
+        status: 'booked',
+        price: service?.price
       };
       
-      saveBookingToLocalStorage(bookingDetails);
+      // Send booking to API
+      const response = await fetch(`http://localhost:4000/api/orders/${salonId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(bookingDetails)
+      });
       
-      console.log("Захиалгын дэлгэрэнгүй:", bookingDetails);
+      if (!response.ok) {
+        throw new Error('Failed to create booking');
+      }
+      
+      const createdBooking = await response.json();
+      console.log("Захиалгын дэлгэрэнгүй:", createdBooking);
       
       setBookingSuccess(true);
       
       setTimeout(() => {
-        navigate(`/payment/${bookingId}`);
+        navigate(`/payment/${createdBooking._id}`);
       }, 1000);
       
     } catch (error) {
       setErrorMessage("Захиалга бүртгэхэд алдаа гарлаа. Дахин оролдоно уу.");
       console.error("Booking error:", error);
+    } finally {
       setIsLoading(false);
     }
   };
 
   const isTimeAvailable = (time: string) => {
-    const existingBookings = getExistingBookings();
-    
+
     const conflictingBooking = existingBookings.find(booking => 
       booking.staffId === selectedStaff && 
       booking.date === selectedDate && 
@@ -279,7 +303,7 @@ const ServiceDetailPage: React.FC = () => {
       <div className="max-w-screen-xl mx-auto px-4 py-4 md:py-8 pb-20">     
         <div className="relative w-full h-60 md:h-80 overflow-hidden">
           <img
-            src={salonDetails.imageUrl}
+            src={salonDetails.image || '/placeholder-salon.jpg'}
             alt="Salon Banner"
             className="w-full h-full object-cover"
           />
@@ -300,10 +324,10 @@ const ServiceDetailPage: React.FC = () => {
                 <div className="flex items-center mt-2">
                   <div className="flex items-center text-yellow-400">
                     {[...Array(5)].map((_, i) => (
-                      <Star key={i} size={16} fill={i < salonDetails.rating ? "currentColor" : "none"} />
+                      <Star key={i} size={16} fill={i < (salonDetails.rating || 4) ? "currentColor" : "none"} />
                     ))}
                   </div>
-                  <span className="ml-2 text-gray-600">{salonDetails.rating}/5</span>
+                  <span className="ml-2 text-gray-600">{salonDetails.rating || 4}/5</span>
                 </div>
               </div>
               <div className="text-4xl font-bold text-purple-500">{service.price}₮</div>
@@ -354,19 +378,19 @@ const ServiceDetailPage: React.FC = () => {
               >
                 <div className="flex items-center">
                   <User size={18} className="text-gray-400 mr-2" />
-                  <span>{selectedStaff ? staffMembers.find(s => s.id === selectedStaff)?.name : "Ажилтан сонгох"}</span>
+                  <span>{selectedStaff ? staffMembers.find(s => s._id === selectedStaff)?.name : "Ажилтан сонгох"}</span>
                 </div>
                 <ChevronDown size={18} className="text-gray-400" />
               </button>
               
               {showStaffDropdown && (
                 <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg">
-                  {staffMembers.map(staff => (
+                  {staffMembers.length > 0 ? staffMembers.map(staff => (
                     <div
-                      key={staff.id}
+                      key={staff._id}
                       className="flex items-center px-4 py-3 hover:bg-gray-50 cursor-pointer"
                       onClick={() => {
-                        setSelectedStaff(staff.id);
+                        setSelectedStaff(staff._id);
                         setShowStaffDropdown(false);
                       }}
                     >
@@ -375,16 +399,15 @@ const ServiceDetailPage: React.FC = () => {
                       </div>
                       <div>
                         <div className="font-medium">{staff.name}</div>
-                        <div className="text-sm text-gray-500">{staff.position}</div>
-                        <div className="text-xs text-gray-400 mt-1">
-                          {staff.specialties.join(", ")}
-                        </div>
+                        <div className="text-sm text-gray-500">{staff.specialty}</div>
                       </div>
-                      {selectedStaff === staff.id && (
+                      {selectedStaff === staff._id && (
                         <CheckCircle size={18} className="ml-auto text-green-500" />
                       )}
                     </div>
-                  ))}
+                  )) : (
+                    <div className="px-4 py-3 text-gray-500">Ажилтан олдсонгүй</div>
+                  )}
                 </div>
               )}
             </div>
@@ -462,7 +485,7 @@ const ServiceDetailPage: React.FC = () => {
               
               {showTimeDropdown && selectedStaff && (
                 <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                  {staffMembers.find(s => s.id === selectedStaff)?.availability.map((time, index) => {
+                  {staffMembers.find(s => s._id === selectedStaff)?.availability?.map((time, index) => {
                     const available = isTimeAvailable(time);
                     return (
                       <div
@@ -505,7 +528,7 @@ const ServiceDetailPage: React.FC = () => {
                 <div className="text-gray-600">Үйлчилгээ:</div>
                 <div className="font-medium">{service.name}</div>
                 <div className="text-gray-600">Ажилтан:</div>
-                <div className="font-medium">{staffMembers.find(s => s.id === selectedStaff)?.name}</div>
+                <div className="font-medium">{staffMembers.find(s => s._id === selectedStaff)?.name}</div>
                 <div className="text-gray-600">Огноо:</div>
                 <div className="font-medium">{selectedDate}</div>
                 <div className="text-gray-600">Цаг:</div>

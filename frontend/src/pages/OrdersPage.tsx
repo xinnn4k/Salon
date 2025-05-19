@@ -11,7 +11,7 @@ import {
 
 type BookingStatus = 'all' | 'pending' | 'confirmed' | 'completed' | 'cancelled';
 
-const BookingsPage: React.FC = () => {
+const OrdersPage: React.FC = () => {
   const navigate = useNavigate();
   const { bookings, cancelBooking, isLoading, error } = useBookings();
   const { user, isAuthenticated } = useAuth(); // Get the current user
@@ -426,4 +426,4 @@ const BookingsPage: React.FC = () => {
   );
 };
 
-export default BookingsPage;
+export default OrdersPage;

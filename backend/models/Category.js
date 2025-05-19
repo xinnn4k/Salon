@@ -10,7 +10,11 @@ const SubcategorySchema = new Schema({
   description: {
     type: String,
     trim: true
-  }
+  },
+    image: {
+      data: Buffer,
+      contentType: String
+    }
 }, { timestamps: true });
 
 const CategorySchema = new Schema({
