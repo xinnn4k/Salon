@@ -1,18 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import {
+  Scissors,
+  Brush,
+  Hand,
+  Eye,
+  Smile,
+  HandHeart,
+  Loader2,
+} from 'lucide-react';
 
 interface Category {
   _id: string;
   name: string;
-  icon: string;
 }
 
 const iconMap: { [key: string]: React.ElementType } = {
-  scissors: require('lucide-react').Scissors,
-  brush: require('lucide-react').Brush,
-  nail: require('lucide-react').Sparkles,
+  'Үсчин': Scissors,
+  'Арьс арчилгаа': Brush,
+  'Хумс': Hand,
+  'Сормуус, хөмсөг': Eye,
+  'Make up': Smile,
+  'Массаж, бие арчилгаа': HandHeart,
 };
+
 
 const CategoryDisplay: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -43,14 +54,14 @@ const CategoryDisplay: React.FC = () => {
         {loading ? (
           <div className="flex items-center justify-center h-40">
             <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
-            <span className="ml-2">Loading...</span>
+            <span className="ml-2">Уншиж байна...</span>
           </div>
         ) : error ? (
-          <p className="text-red-500">Failed to load: {error}</p>
+          <p className="text-red-500">Алдаа гарлаа: {error}</p>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {categories.map((category) => {
-              const Icon = iconMap[category.icon] || require('lucide-react').Scissors;
+              const Icon = iconMap[category.name] || Scissors;
               return (
                 <Link
                   key={category._id}

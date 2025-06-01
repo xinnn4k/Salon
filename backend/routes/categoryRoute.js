@@ -19,6 +19,80 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.get('/subcategories/search', async (req, res) => {
+  try {
+    const { query } = req.query;
+    
+    let searchCriteria = {};
+    
+    if (query && query.trim()) {
+      // Search in subcategory names and descriptions
+      searchCriteria = {
+        $or: [
+          { 'subcategories.name': { $regex: query.trim(), $options: 'i' } },
+          { 'subcategories.description': { $regex: query.trim(), $options: 'i' } }
+        ]
+      };
+    }
+    
+    const categories = await Category.find(searchCriteria, 'name subcategories');
+    
+    // Filter and flatten subcategories that match the search
+    const matchingSubcategories = [];
+    
+    categories.forEach(category => {
+      category.subcategories.forEach(sub => {
+        if (!query || query.trim() === '' || 
+            sub.name.toLowerCase().includes(query.toLowerCase()) ||
+            (sub.description && sub.description.toLowerCase().includes(query.toLowerCase()))) {
+          
+          const subObj = sub.toObject();
+          
+          // Format image the same way as your existing endpoint
+          if (sub.image && sub.image.data) {
+            const base64Image = Buffer.from(sub.image.data).toString('base64');
+            subObj.image = `data:${sub.image.contentType};base64,${base64Image}`;
+          }
+          
+          // Add category info
+          subObj.categoryId = category._id;
+          subObj.categoryName = category.name;
+          
+          matchingSubcategories.push(subObj);
+        }
+      });
+    });
+    
+    res.json(matchingSubcategories);
+  } catch (error) {
+    console.error('Error searching subcategories:', error);
+    res.status(500).json({ message: 'Failed to search subcategories' });
+  }
+});
+
+// Get all subcategories (for initial load or empty search)
+router.get('/subcategories', async (req, res) => {
+  try {
+    const categories = await Category.find({}, 'name subcategories');
+    
+    const allSubcategories = categories.reduce((acc, category) => {
+      return acc.concat(category.subcategories.map(sub => ({
+        _id: sub._id,
+        name: sub.name,
+        description: sub.description,
+        image: sub.image,
+        categoryId: category._id,
+        categoryName: category.name
+      })));
+    }, []);
+    
+    res.json(allSubcategories);
+  } catch (error) {
+    console.error('Error fetching subcategories:', error);
+    res.status(500).json({ message: 'Failed to fetch subcategories' });
+  }
+});
+
 router.get('/subcategory/:subcategoryId', async (req, res) => {
   try {
     const { subcategoryId } = req.params;

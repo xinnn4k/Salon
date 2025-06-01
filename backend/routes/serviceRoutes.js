@@ -5,6 +5,33 @@ const multer = require('multer');
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
+
+
+router.get('/search', async (req, res) => {
+    try {
+        const { service } = req.query;
+
+        const query = {};
+        if (service) {
+            query.name = { $regex: new RegExp(service, 'i') };
+        }
+
+        const services = await Service.find(query);
+        const formatted = services.map(s => {
+            const obj = s.toObject();
+            if (obj.image) {
+                obj.image = `data:image/jpeg;base64,${obj.image.toString('base64')}`;
+            }
+            return obj;
+        });
+
+        res.json(formatted);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
 router.get('/:salonId', async (req, res) => {
     try {
         const services = await Service.find({ salonId: req.params.salonId });
@@ -23,6 +50,23 @@ router.get('/:salonId', async (req, res) => {
     }
 });
 
+router.get('/', async (req, res) => {
+    try {
+        const services = await Service.find({});
+
+        const formattedServices = services.map(service => {
+            const obj = service.toObject();
+            if (obj.image) {
+                obj.image = `data:image/jpeg;base64,${obj.image.toString('base64')}`;
+            }
+            return obj;
+        });
+
+        res.json(formattedServices);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 router.get('/:salonId/:serviceId', async (req, res) => {
     try {
@@ -109,5 +153,7 @@ router.delete('/:salonId/:serviceId', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+
 
 module.exports = router;
